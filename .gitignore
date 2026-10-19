@@ -1,0 +1,12 @@
+__pycache__/
+.venv/
+.env
+.env.*
+.streamlit/secrets.toml
+planner_startup.log
+planner_launcher.log
+assignments.json
+assignments_backup.json
+*_backup.json
+*.ics
+*.csv
