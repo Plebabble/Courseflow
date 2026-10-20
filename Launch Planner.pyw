@@ -1,4 +1,6 @@
+import json
 import queue
+import re
 import site
 import socket
 import subprocess
@@ -54,6 +56,18 @@ def choose_port():
         return sock.getsockname()[1]
 
 
+def saved_button_color():
+    """Use the current palette button color as Streamlit's primary color."""
+    try:
+        saved_data = json.loads((FOLDER / "assignments.json").read_text(encoding="utf-8"))
+        color = saved_data.get("app_theme", {}).get("button")
+        if isinstance(color, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+            return color
+    except (OSError, json.JSONDecodeError, AttributeError):
+        pass
+    return "#A98767"
+
+
 def start_planner(cancelled):
     log_launcher("Preparing planner startup.")
     if cancelled.is_set():
@@ -84,6 +98,7 @@ def start_planner(cancelled):
         "--server.headless=true",
         "--server.address=127.0.0.1",
         f"--server.port={port}",
+        f"--theme.primaryColor={saved_button_color()}",
         "--browser.gatherUsageStats=false",
     ]
     log_file = STARTUP_LOG.open("w", encoding="utf-8")

@@ -1,3 +1,4 @@
+import calendar as calendar_module
 import json
 import html
 import math
@@ -10,8 +11,7 @@ import streamlit as st
 
 DATA_FILE = Path("assignments.json")
 CALENDAR_FILE = Path("calendar.ics")
-DEFAULT_WAKE_START = time(7, 0)
-DEFAULT_WAKE_END = time(23, 0)
+SLEEP_HOURS_PER_DAY = 8.0
 
 
 COURSES = ["Course 1", "Course 2", "Course 3", "Other"]
@@ -25,13 +25,97 @@ APP_THEME_DEFAULTS = {
     "background": "#E8DBC7",
     "sidebar": "#DDCBB1",
     "text": "#40392F",
-    "button": "#76553F",
+    "button": "#A98767",
     "button_text": "#FFF8ED",
     "card": "#D7C2A6",
     "card_text": "#493D31",
     "input": "#FFFDF8",
     "border": "#B89C7B",
     "surface": "#F4EADB",
+    "dropdown": "#E2D1B8",
+    "progress": "#B9D8BD",
+    "hover": "#D5C1A7",
+}
+APP_THEME_PALETTES = {
+    "Beige": dict(APP_THEME_DEFAULTS),
+    "Forest green": {
+        "background": "#E6EBE2", "sidebar": "#D5DED1", "text": "#2F3D31",
+        "button": "#5C765F", "button_text": "#F7F8F2", "card": "#D3DFD0",
+        "card_text": "#304033", "input": "#FBFCF8", "border": "#A8B9A4",
+        "surface": "#F0F3EC", "dropdown": "#DCE5D9", "progress": "#AFC3AD", "hover": "#C5D4C2",
+    },
+    "Mint": {
+        "background": "#E6F2F0", "sidebar": "#D5E9E6", "text": "#304441",
+        "button": "#78AAA2", "button_text": "#183C38", "card": "#CDE5E0",
+        "card_text": "#304441", "input": "#FBFDFC", "border": "#A4C8C1",
+        "surface": "#F1F8F6", "dropdown": "#D9EBE7", "progress": "#A8D9CF", "hover": "#C4E1DB",
+    },
+    "Pink": {
+        "background": "#F5E8E9", "sidebar": "#EBD7D9", "text": "#503D42",
+        "button": "#B97F8C", "button_text": "#FFF9F8", "card": "#EFD8DC",
+        "card_text": "#503D42", "input": "#FFFCFC", "border": "#D2AEB4",
+        "surface": "#FAF1F1", "dropdown": "#F0DFE1", "progress": "#E7BBC5", "hover": "#E8CDD2",
+    },
+    "Dark mode": {
+        "background": "#25232B", "sidebar": "#302D38", "text": "#F0EDF5",
+        "button": "#9D86C5", "button_text": "#211C2A", "card": "#3A3643",
+        "card_text": "#F0EDF5", "input": "#302D38", "border": "#62576F",
+        "surface": "#302D37", "dropdown": "#3B3645", "progress": "#806AA6", "hover": "#51475F",
+    },
+    "Autumn": {
+        "background": "#F1E4D2", "sidebar": "#E5D1B5", "text": "#4D3B2D",
+        "button": "#C17A45", "button_text": "#FFF8EF", "card": "#E9D0AE",
+        "card_text": "#4D3B2D", "input": "#FFFCF7", "border": "#C9A77D",
+        "surface": "#F8EFE2", "dropdown": "#EAD8BE", "progress": "#DDAE76", "hover": "#E4C49E",
+    },
+    "Lavender": {
+        "background": "#EFECF5", "sidebar": "#E1DCEC", "text": "#433D51",
+        "button": "#9482B4", "button_text": "#FFFCFF", "card": "#DED8EB",
+        "card_text": "#433D51", "input": "#FDFCFF", "border": "#B9AFD0",
+        "surface": "#F7F5FA", "dropdown": "#E7E1F0", "progress": "#C4B6DD", "hover": "#DBD3E8",
+    },
+    "Ocean": {
+        "background": "#E7F1F7", "sidebar": "#D4E5EF", "text": "#2A3F50",
+        "button": "#4F83A8", "button_text": "#F7FBFE", "card": "#D2E4EF",
+        "card_text": "#2A3F50", "input": "#FBFDFF", "border": "#A9C5D7",
+        "surface": "#F2F7FA", "dropdown": "#DCEAF2", "progress": "#A6CADF", "hover": "#C4DCEB",
+    },
+    "Peach": {
+        "background": "#F8EEE7", "sidebar": "#EBD9CC", "text": "#4E3A32",
+        "button": "#BD765C", "button_text": "#FFF8F4", "card": "#EFD7C8",
+        "card_text": "#4E3A32", "input": "#FFFCFA", "border": "#D2B2A0",
+        "surface": "#FBF4EF", "dropdown": "#EFDFD4", "progress": "#E8B99F", "hover": "#E6CAB9",
+    },
+    "Buttercup": {
+        "background": "#F5F0DE", "sidebar": "#E9E0C4", "text": "#4C4532",
+        "button": "#A58B45", "button_text": "#FFFDF5", "card": "#EBE2C6",
+        "card_text": "#4C4532", "input": "#FFFEFA", "border": "#D0C39B",
+        "surface": "#FAF6E9", "dropdown": "#EDE5CB", "progress": "#DDCF8C", "hover": "#E8DDB6",
+    },
+    "Berry": {
+        "background": "#F4EAF1", "sidebar": "#E7D6E3", "text": "#473742",
+        "button": "#996B91", "button_text": "#FFF9FD", "card": "#EAD8E7",
+        "card_text": "#473742", "input": "#FFFCFE", "border": "#C8AFC4",
+        "surface": "#F8F1F7", "dropdown": "#EADBE9", "progress": "#D5B4D0", "hover": "#DFC7DD",
+    },
+    "Slate": {
+        "background": "#E9EDF2", "sidebar": "#D9E0E8", "text": "#343E4B",
+        "button": "#657C99", "button_text": "#F8FAFD", "card": "#D7E0E9",
+        "card_text": "#343E4B", "input": "#FCFDFE", "border": "#B2BECC",
+        "surface": "#F3F5F8", "dropdown": "#DFE5EC", "progress": "#B6C5D8", "hover": "#CED8E3",
+    },
+    "Terracotta": {
+        "background": "#F2E7DD", "sidebar": "#E5D1BF", "text": "#4B382F",
+        "button": "#A96043", "button_text": "#FFF8F2", "card": "#E8D0BD",
+        "card_text": "#4B382F", "input": "#FFFCF8", "border": "#C9A88D",
+        "surface": "#F8F0E8", "dropdown": "#E9D7C7", "progress": "#DFAF91", "hover": "#DEC1AE",
+    },
+    "Monochrome": {
+        "background": "#F0F0EF", "sidebar": "#E0E0DE", "text": "#353637",
+        "button": "#62676C", "button_text": "#FFFFFF", "card": "#DEDFDE",
+        "card_text": "#353637", "input": "#FCFCFB", "border": "#B9BCBC",
+        "surface": "#F5F5F3", "dropdown": "#E5E6E5", "progress": "#B8C6C4", "hover": "#D3D8D7",
+    },
 }
 WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 DEFAULT_COURSE_MEETING_DAYS = {}
@@ -44,44 +128,67 @@ def infer_course(name):
             return course_name
     return "Other" if "Other" in COURSE_COLORS else next(iter(COURSE_COLORS))
 
+
+def shift_schedule_calendar_anchor(amount):
+    anchor = st.session_state.get("schedule_calendar_anchor", date.today())
+    if not isinstance(anchor, date):
+        anchor = date.today()
+    if st.session_state.get("schedule_calendar_period", "Week") == "Week":
+        st.session_state["schedule_calendar_anchor"] = anchor + timedelta(days=amount * 7)
+        return
+    month_index = anchor.month - 1 + amount
+    year = anchor.year + month_index // 12
+    month = month_index % 12 + 1
+    day_number = min(anchor.day, calendar_module.monthrange(year, month)[1])
+    st.session_state["schedule_calendar_anchor"] = date(year, month, day_number)
+
+
+def set_schedule_calendar_anchor_today():
+    st.session_state["schedule_calendar_anchor"] = date.today()
+
 st.set_page_config(page_title="Assignment Planner", page_icon="📚", layout="wide")
 
 
 st.markdown("""
 <style>
-    .stApp { background: #e8dbc7; color: #40392f; }
-    [data-testid="stAppViewContainer"] { background: #e8dbc7; }
-    [data-testid="stHeader"] { background: rgba(232,219,199,0.96); }
-    [data-testid="stSidebar"] { background: #ddcbb1; border-right: 1px solid #c7af91; }
+    .stApp { background: var(--planner-background); color: var(--planner-text); }
+    [data-testid="stAppViewContainer"] { background: var(--planner-background); }
+    [data-testid="stHeader"] { background: var(--planner-background); }
+    #MainMenu, footer, .stDeployButton, [data-testid="stToolbar"],
+    [data-testid="stToolbarActions"], [data-testid="stDecoration"] {
+        display: none !important;
+        visibility: hidden !important;
+    }
+    [data-testid="stSidebar"] { background: var(--planner-sidebar); border-right: 1px solid var(--planner-border); }
     .block-container { padding-top: 2rem; padding-bottom: 3rem; max-width: 1180px; }
     h1, h2, h3, h4, p, label, span, div { letter-spacing: -0.015em; }
-    h1, h2, h3 { color: #433c32; letter-spacing: -0.035em; }
-    [data-testid="stMarkdownContainer"] { color: #4b4035; }
-    [data-testid="stCaptionContainer"] { color: #776553; }
-    [data-testid="stWidgetLabel"] p, .stApp label, .stApp p { color: #4b443a; }
-    [data-testid="stAlert"] { background: #f2e6d5; border-color: #d5c0a2; color: #4b4035; }
-    div[data-testid="stProgress"] > div > div { background: #b9d8bd; }
-    .stApp button[kind="primary"] { background: #76553f; border-color: #684a36; color: #fff8ed; }
-    .stApp button[kind="secondary"] { background: #e2d1b8; border-color: #cbb391; color: #4b4035; }
+    h1, h2, h3 { color: var(--planner-text); letter-spacing: -0.035em; }
+    [data-testid="stMarkdownContainer"] { color: var(--planner-text); }
+    [data-testid="stCaptionContainer"] { color: var(--planner-text); }
+    [data-testid="stWidgetLabel"] p, .stApp label, .stApp p { color: var(--planner-text); }
+    [data-testid="stAlert"] { background: var(--planner-surface); border-color: var(--planner-border); color: var(--planner-text); }
+    div[data-testid="stProgress"] > div > div { background: var(--planner-progress); }
+    .stApp button[kind="primary"] { background: var(--planner-button); border-color: var(--planner-border); color: var(--planner-button_text); }
+    .stApp button[kind="secondary"] { background: var(--planner-dropdown); border-color: var(--planner-border); color: var(--planner-text); }
     div[data-testid="stMetric"] {
-        background: #624837; border: 1px solid #7b5c43;
+        background: var(--planner-card); border: 1px solid var(--planner-border);
         padding: 16px 18px; border-radius: 14px;
     }
-    div[data-testid="stMetricLabel"] { color: #eadbc6; }
-    div[data-testid="stMetricValue"] { color: #fff8ed; font-weight: 750; }
+    div[data-testid="stMetricLabel"] { color: var(--planner-card_text); }
+    div[data-testid="stMetricValue"] { color: var(--planner-button_text); font-weight: 750; }
     div[data-testid="stTabs"] button { font-weight: 650; }
-    div[data-testid="stTabs"] button p { color: #655c50; }
+    div[data-testid="stTabs"] button p { color: var(--planner-text); }
     div[data-testid="stForm"] {
-        background: #f4eadb; border: 1px solid #d6c2a7;
+        background: var(--planner-surface); border: 1px solid var(--planner-border);
         border-radius: 14px; padding: 14px 16px;
     }
     [data-testid="stFileUploaderDropzone"] {
-        background: #f1e5d3 !important; border: 1px dashed #b99e7d !important;
+        background: var(--planner-surface) !important; border: 1px dashed var(--planner-border) !important;
     }
-    [data-testid="stFileUploaderDropzone"] * { color: #564839 !important; }
+    [data-testid="stFileUploaderDropzone"] * { color: var(--planner-text) !important; }
     [data-testid="stFileUploaderDropzone"] button {
-        background: #e2d1b8 !important; color: #574535 !important;
-        border-color: #c5aa88 !important;
+        background: var(--planner-dropdown) !important; color: var(--planner-text) !important;
+        border-color: var(--planner-border) !important;
     }
     [data-testid="stFileUploader"] section { background: transparent !important; }
     /* Style the outer BaseWeb shell once. Styling its nested base-input too
@@ -93,9 +200,9 @@ st.markdown("""
     .stApp [data-testid="stTextArea"] [data-baseweb="textarea"],
     .stApp [data-testid="stSelectbox"] [data-baseweb="select"] > div,
     .stApp [data-testid="stMultiSelect"] [data-baseweb="select"] > div {
-        background: #fffdf8 !important;
-        color: #453e34 !important;
-        border: 1px solid #c8b393 !important;
+        background: var(--planner-input) !important;
+        color: var(--planner-text) !important;
+        border: 1px solid var(--planner-border) !important;
         border-radius: 11px !important;
         box-shadow: none !important;
         outline: 0 !important;
@@ -119,8 +226,8 @@ st.markdown("""
     .stApp [data-testid="stTextArea"] [data-baseweb="textarea"]:focus-within,
     .stApp [data-testid="stSelectbox"] [data-baseweb="select"] > div:focus-within,
     .stApp [data-testid="stMultiSelect"] [data-baseweb="select"] > div:focus-within {
-        border-color: #a88b69 !important;
-        box-shadow: 0 0 0 2px rgba(168, 139, 105, .16) !important;
+        border-color: var(--planner-button) !important;
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--planner-button) 16%, transparent) !important;
     }
     .stApp [data-testid="stTextInput"] input,
     .stApp [data-testid="stNumberInput"] input,
@@ -128,8 +235,8 @@ st.markdown("""
     .stApp [data-testid="stTimeInput"] input,
     .stApp [data-testid="stTextArea"] textarea,
     .stApp [data-testid="stMultiSelect"] input {
-        background: #fffdf8 !important;
-        color: #453e34 !important;
+        background: var(--planner-input) !important;
+        color: var(--planner-text) !important;
         border: 0 !important;
         border-radius: 0 !important;
         box-shadow: none !important;
@@ -143,85 +250,88 @@ st.markdown("""
        fill as the input itself. Only the fill changes; borders and shape stay
        defined by the control rules above. */
     .stApp [data-testid="stSelectbox"] [data-baseweb="select"] div,
-    .stApp [data-testid="stMultiSelect"] [data-baseweb="select"] div,
     .stApp [data-testid="stDateInput"] [data-baseweb="input"] div,
     .stApp [data-testid="stDateInput"] [data-baseweb="input"] input {
-        background-color: #fffdf8 !important;
+        background-color: var(--planner-input) !important;
     }
     .stApp [data-testid="stNumberInput"] input { text-align: center; }
     .stApp [data-testid="stNumberInput"] button,
     .stApp [data-testid="stTimeInput"] button {
-        background: #f1e6d5 !important;
-        color: #574535 !important;
+        background: var(--planner-surface) !important;
+        color: var(--planner-text) !important;
         border: 0 !important;
         border-radius: 0 !important;
         box-shadow: none !important;
         outline: 0 !important;
     }
-    .stApp [data-testid="stNumberInput"] button:hover,
-    .stApp [data-testid="stTimeInput"] button:hover { background: #e9dbc5 !important; }
     .stApp [data-testid="stMultiSelect"] [data-baseweb="tag"] {
-        background: #e9dfcf !important; color: #514333 !important;
+        background: var(--planner-dropdown) !important; color: var(--planner-text) !important;
         border-radius: 8px !important;
     }
+    .stApp [data-testid="stMultiSelect"] [data-baseweb="tag"] *,
+    .stApp [data-testid="stMultiSelect"] [data-baseweb="tag"] button,
+    .stApp [data-testid="stMultiSelect"] [data-baseweb="tag"] svg {
+        background: transparent !important;
+        color: var(--planner-text) !important;
+        fill: var(--planner-text) !important;
+    }
+    .stApp [data-testid="stMultiSelect"] input {
+        background: transparent !important;
+        min-width: 2px !important;
+        width: auto !important;
+    }
     .stApp [data-testid="stDateInput"] button {
-        color: #69563f !important; border: 0 !important;
+        color: var(--planner-text) !important; border: 0 !important;
         background: transparent !important; box-shadow: none !important;
     }
     .stApp [data-testid="stForm"] button,
     .stApp [data-testid="stSidebar"] button {
-        background: #e2d1b8 !important;
-        color: #514333 !important;
-        border-color: #c5aa88 !important;
+        background: var(--planner-dropdown) !important;
+        color: var(--planner-text) !important;
+        border-color: var(--planner-border) !important;
         box-shadow: none !important;
     }
     .stApp [data-baseweb="popover"] [role="listbox"],
     .stApp [data-baseweb="popover"] [role="option"] {
-        background: #fffdf8 !important;
-        color: #453e34 !important;
+        background: var(--planner-input) !important;
+        color: var(--planner-text) !important;
     }
     .stApp [data-baseweb="popover"] [data-testid="stDatePicker"] *,
     .stApp [data-baseweb="popover"] [data-testid="stTimePicker"] * {
-        color: #453e34 !important;
+        color: var(--planner-text) !important;
     }
-    .stApp [data-baseweb="popover"] [role="option"]:hover,
-    .stApp [data-baseweb="popover"] [aria-selected="true"] {
-        background: #efe3d1 !important;
-        color: #453e34 !important;
-    }
-    .stApp input[type="checkbox"], .stApp input[type="radio"] { accent-color: #8c7154; color-scheme: light; }
-    .stApp [data-testid="stSlider"] [role="slider"] { background: #8c7154 !important; }
+    .stApp input[type="checkbox"], .stApp input[type="radio"] { accent-color: var(--planner-button); color-scheme: light; }
+    .stApp [data-testid="stSlider"] [role="slider"] { background: var(--planner-button) !important; }
     .stApp [data-testid="stExpander"] details,
-    .stApp [data-testid="stExpander"] summary,
-    .stApp [data-testid="stExpander"] summary:hover {
-        background: #d7c2a6 !important;
-        color: #514333 !important;
+    .stApp [data-testid="stExpander"] summary {
+        background: var(--planner-card) !important;
+        color: var(--planner-text) !important;
     }
     div[data-testid="stVerticalBlockBorderWrapper"] {
-        background: #d7c2a6 !important; border: 1px solid #b89c7b !important;
+        background: var(--planner-card) !important; border: 1px solid var(--planner-border) !important;
         border-radius: 15px !important;
     }
     div[data-testid="stVerticalBlockBorderWrapper"] > div { background: transparent !important; border-color: transparent !important; }
     div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMarkdownContainer"],
     div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stCaptionContainer"],
-    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stWidgetLabel"] p { color: #514333 !important; }
+    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stWidgetLabel"] p { color: var(--planner-text) !important; }
     div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMarkdownContainer"],
-    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stCaptionContainer"] { color: #514333 !important; }
-    div[data-testid="stExpander"] { background: #d7c2a6; border: 1px solid #b89c7b; border-radius: 13px; }
+    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stCaptionContainer"] { color: var(--planner-text) !important; }
+    div[data-testid="stExpander"] { background: var(--planner-card); border: 1px solid var(--planner-border); border-radius: 13px; }
     div[data-testid="stExpander"] summary, div[data-testid="stExpander"] summary p,
-    div[data-testid="stExpander"] [data-testid="stMarkdownContainer"] { color: #514333 !important; }
+    div[data-testid="stExpander"] [data-testid="stMarkdownContainer"] { color: var(--planner-text) !important; }
     .assignment-card {
-        border: 1px solid #b89c7b; border-radius: 16px;
-        background: linear-gradient(145deg, #d7c2a6, #cdb391);
+        border: 1px solid var(--planner-border); border-radius: 16px;
+        background: linear-gradient(145deg, var(--planner-card), var(--planner-card));
         padding: 17px 18px; margin: 0 0 8px 0; min-height: 220px;
     }
     .assignment-card.due-today {
-        border: 3px solid #c96f59;
-        box-shadow: 0 0 0 1px rgba(201,111,89,.18), 0 7px 20px rgba(113,66,49,.16);
+        border: 3px solid var(--planner-button);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--planner-button) 18%, transparent), 0 7px 20px color-mix(in srgb, var(--planner-text) 16%, transparent);
     }
     .due-today-tag {
-        display: inline-block; color: #6a3f36; border: 1px solid #e5b7ad;
-        background: #f8e5df; border-radius: 999px;
+        display: inline-block; color: var(--planner-text); border: 1px solid var(--planner-border);
+        background: var(--planner-surface); border-radius: 999px;
         padding: 3px 9px; font-size: .72rem; font-weight: 800;
         letter-spacing: .06em; text-transform: uppercase; margin-left: 8px;
         vertical-align: middle;
@@ -229,27 +339,27 @@ st.markdown("""
     .target-line { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 
     .assignment-title {
-        display: inline-block; color: #493d31; font-size: 1.22rem;
+        display: inline-block; color: var(--planner-card_text); font-size: 1.22rem;
         line-height: 1.35; font-weight: 750; padding: 9px 15px;
         border-radius: 10px; margin-bottom: 12px;
         overflow-wrap: anywhere;
     }
     .target-label {
-        color: #6b5845; text-transform: uppercase; letter-spacing: .11em;
+        color: var(--planner-text); text-transform: uppercase; letter-spacing: .11em;
         font-size: .78rem; font-weight: 750; margin-top: 2px;
     }
     .target-number {
-        color: #493d31; font-size: 2.65rem; line-height: 1.12;
+        color: var(--planner-card_text); font-size: 2.65rem; line-height: 1.12;
         font-weight: 850; letter-spacing: -.05em; margin: 4px 0 5px 0;
     }
-    .target-unit { color: #6b5845; font-size: 1.35rem; font-weight: 700; letter-spacing: -.02em; }
-    .assignment-meta { color: #6b5845; font-size: .9rem; margin-top: 7px; }
+    .target-unit { color: var(--planner-text); font-size: 1.35rem; font-weight: 700; letter-spacing: -.02em; }
+    .assignment-meta { color: var(--planner-text); font-size: .9rem; margin-top: 7px; }
     .historical-progress {
         display: inline-flex; margin-top: 10px; padding: 5px 10px;
-        border: 1px solid #b89c7b; border-radius: 999px;
-        background: #e6d5bc; color: #554434; font-size: .8rem;
+        border: 1px solid var(--planner-border); border-radius: 999px;
+        background: var(--planner-surface); color: var(--planner-card_text); font-size: .8rem;
     }
-    .today-progress-label { color: #5c4b3b; font-size: .88rem; font-weight: 650; }
+    .today-progress-label { color: var(--planner-text); font-size: .88rem; font-weight: 650; }
     div[data-testid="stVerticalBlock"] > div:has(> .assignment-card) { gap: .35rem; }
     @media (max-width: 700px) {
         .target-number { font-size: 2.1rem; }
@@ -265,11 +375,111 @@ def load_data():
             return json.loads(DATA_FILE.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             st.error("Could not read assignments.json. Make a backup before replacing it.")
-    return {"assignments": [], "calendar_events": [], "calendar_name": None, "daily_availability_overrides": {}}
+    return {"assignments": [], "calendar_events": [], "calendar_name": None}
 
 
 def save_data(data):
     DATA_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def save_course_settings(course_name):
+    """Persist edited course fields as soon as a widget change is committed."""
+    categories = data.get("course_categories", {})
+    if course_name not in categories:
+        return
+
+    name_key = f"category_name_{course_name}"
+    color_key = f"category_color_{course_name}"
+    days_key = f"category_meeting_days_{course_name}"
+    prep_key = f"category_prep_days_{course_name}"
+    review_key = f"category_review_days_{course_name}"
+    new_name = str(st.session_state.get(name_key, course_name)).strip()
+    if not new_name:
+        st.session_state[name_key] = course_name
+        st.session_state["course_edit_error"] = "Course names cannot be blank."
+        return
+    if any(name != course_name and name.casefold() == new_name.casefold() for name in categories):
+        st.session_state[name_key] = course_name
+        st.session_state["course_edit_error"] = f"{new_name} is already in your course list."
+        return
+
+    new_color = st.session_state.get(color_key, categories[course_name])
+    meeting_days = st.session_state.get(days_key, data["course_meeting_days"].get(course_name, []))
+    prep_days = int(st.session_state.get(prep_key, data["course_prep_days_before"].get(course_name, 1)))
+    prep_days = -1 if prep_days < 0 else min(14, max(0, prep_days))
+    review_days = int(st.session_state.get(review_key, data["course_review_days_after"].get(course_name, 1)))
+    review_days = min(2, max(0, review_days))
+
+    updated_categories = {
+        (new_name if name == course_name else name):
+        (new_color if name == course_name else color)
+        for name, color in categories.items()
+    }
+    if new_name != course_name:
+        for linked_data_key in (
+            "class_topics", "course_meeting_days", "course_prep_days_before",
+            "course_review_days_after",
+        ):
+            linked_data = data.setdefault(linked_data_key, {})
+            if course_name in linked_data:
+                linked_data[new_name] = linked_data.pop(course_name)
+        for assignment in data.get("assignments", []):
+            if assignment.get("course") == course_name:
+                assignment["course"] = new_name
+        for lecture_task in data.get("lecture_tasks", []):
+            if lecture_task.get("course") == course_name:
+                lecture_task["course"] = new_name
+                lecture_task["id"] = lecture_task["id"].replace(f"{course_name}|", f"{new_name}|", 1)
+        for widget_key in ("topic_manager_course", "new_course"):
+            if st.session_state.get(widget_key) == course_name:
+                st.session_state[widget_key] = new_name
+        for assignment in data.get("assignments", []):
+            assignment_course_key = f"course_{assignment.get('id')}"
+            if st.session_state.get(assignment_course_key) == course_name:
+                st.session_state[assignment_course_key] = new_name
+
+    data["course_categories"] = updated_categories
+    data["course_meeting_days"][new_name] = list(meeting_days)
+    data["course_prep_days_before"][new_name] = prep_days
+    data["course_review_days_after"][new_name] = review_days
+    COURSE_COLORS.clear()
+    COURSE_COLORS.update(updated_categories)
+    COURSES[:] = list(COURSE_COLORS)
+    save_data(data)
+    st.session_state["course_autosave_notice"] = f"{new_name} saved"
+
+
+def delete_course_settings(course_name):
+    categories = data.get("course_categories", {})
+    if len(categories) <= 1:
+        st.session_state["course_edit_error"] = "Keep at least one course or category."
+        return
+
+    remaining_categories = {name: color for name, color in categories.items() if name != course_name}
+    replacement_course = next(iter(remaining_categories))
+    for assignment in data.get("assignments", []):
+        if assignment.get("course") == course_name:
+            assignment["course"] = replacement_course
+            assignment_course_key = f"course_{assignment.get('id')}"
+            if st.session_state.get(assignment_course_key) == course_name:
+                st.session_state[assignment_course_key] = replacement_course
+    for widget_key in ("topic_manager_course", "new_course"):
+        if st.session_state.get(widget_key) == course_name:
+            st.session_state[widget_key] = replacement_course
+
+    data.get("class_topics", {}).pop(course_name, None)
+    data.get("course_meeting_days", {}).pop(course_name, None)
+    data.get("course_prep_days_before", {}).pop(course_name, None)
+    data.get("course_review_days_after", {}).pop(course_name, None)
+    data["lecture_tasks"] = [
+        task for task in data.get("lecture_tasks", []) if task.get("course") != course_name
+    ]
+    data["course_categories"] = remaining_categories
+    COURSE_COLORS.clear()
+    COURSE_COLORS.update(remaining_categories)
+    COURSES[:] = list(COURSE_COLORS)
+    save_data(data)
+    st.session_state["course_autosave_notice"] = f"{course_name} deleted"
 
 
 def _calendar_datetime(value):
@@ -448,54 +658,6 @@ def parse_ics(uploaded_file):
     return events
 
 
-def normalize_imported_assignments(payload, today):
-    """Accept either a list of assignments or an object containing an assignments list."""
-    rows = payload.get("assignments", []) if isinstance(payload, dict) else payload
-    if not isinstance(rows, list):
-        raise ValueError("JSON must be a list of assignments or an object with an 'assignments' list.")
-
-    normalized = []
-    for index, row in enumerate(rows, start=1):
-        if not isinstance(row, dict):
-            raise ValueError(f"Assignment #{index} must be an object.")
-        name = str(row.get("name", "")).strip()
-        if not name:
-            raise ValueError(f"Assignment #{index} is missing a name.")
-
-        total = int(row.get("total_units", row.get("questions", 0)))
-        completed = int(row.get("completed_units", row.get("done", 0)))
-        due_raw = row.get("due_date", row.get("due"))
-        if not due_raw:
-            raise ValueError(f"Assignment '{name}' is missing due_date (YYYY-MM-DD).")
-        if isinstance(due_raw, date):
-            due_iso = due_raw.isoformat()
-        else:
-            due_iso = date.fromisoformat(str(due_raw)).isoformat()
-
-        unit = str(row.get("unit", "Questions")).strip() or "Questions"
-        if total < 1 or completed < 0 or completed > total:
-            raise ValueError(f"Assignment '{name}' has invalid total/completed values.")
-
-        course = str(row.get("course", infer_course(name))).strip()
-        if course not in COURSES:
-            course = "Other" if "Other" in COURSES else COURSES[0]
-
-        normalized.append({
-            "id": str(uuid.uuid4()),
-            "name": name,
-            "course": course,
-            "mode": "units",
-            "start_date": today.isoformat(),
-            "total_units": total,
-            "unit": unit,
-            "due_date": due_iso,
-            "completed_units": completed,
-            "today_completed": 0,
-            "today_date": today.isoformat(),
-        })
-    return normalized
-
-
 def merge_intervals(intervals, max_gap_minutes=30):
     """Merge overlapping/nearby busy events. Short gaps are not counted as free."""
     if not intervals:
@@ -512,9 +674,9 @@ def merge_intervals(intervals, max_gap_minutes=30):
     return [(start, end) for start, end in merged]
 
 
-def daily_calendar_free_hours(day, events, wake_start, wake_end, ignore_gap_minutes):
-    day_start = datetime.combine(day, wake_start)
-    day_end = datetime.combine(day, wake_end)
+def daily_calendar_free_hours(day, events, ignore_gap_minutes):
+    day_start = datetime.combine(day, time.min)
+    day_end = day_start + timedelta(days=1)
     intervals = []
     for event in events:
         start = datetime.fromisoformat(event["start"])
@@ -531,25 +693,16 @@ def daily_calendar_free_hours(day, events, wake_start, wake_end, ignore_gap_minu
         cursor = max(cursor, end)
     if cursor < day_end:
         free_minutes += (day_end - cursor).total_seconds() / 60
-    return max(0.0, free_minutes / 60)
+    return max(0.0, free_minutes / 60 - SLEEP_HOURS_PER_DAY)
 
 
 def get_calendar_estimate_hours(day, settings, events, has_calendar):
-    """Estimate free hours from the imported calendar, or use a default without one."""
-    if has_calendar:
-        return daily_calendar_free_hours(
-            day, events, settings["wake_start"], settings["wake_end"],
-            settings["ignore_gap_minutes"]
-        )
-    return settings["weekday_fallback"] if day.weekday() < 5 else settings["weekend_fallback"]
+    """Estimate free time across the whole day, reserving eight hours for sleep."""
+    return daily_calendar_free_hours(day, events, settings["ignore_gap_minutes"])
 
 
 def get_daily_availability_hours(day, settings, events, has_calendar):
-    """Use a date-specific manual value when one exists; otherwise use the estimate."""
-    overrides = settings.get("daily_availability", {})
-    key = day.isoformat()
-    if key in overrides:
-        return max(0.0, float(overrides[key]))
+    """Use the calendar-based daily estimate for scheduling."""
     return get_calendar_estimate_hours(day, settings, events, has_calendar)
 
 
@@ -679,6 +832,26 @@ data["course_meeting_days"] = {
     ]
     for course_name in COURSE_COLORS
 }
+saved_prep_offsets = data.get("course_prep_days_before", {})
+if not isinstance(saved_prep_offsets, dict):
+    saved_prep_offsets = {}
+data["course_prep_days_before"] = {}
+for course_name in COURSE_COLORS:
+    try:
+        prep_days_before = int(saved_prep_offsets.get(course_name, 1))
+    except (TypeError, ValueError):
+        prep_days_before = 1
+    data["course_prep_days_before"][course_name] = -1 if prep_days_before < 0 else min(14, max(0, prep_days_before))
+saved_review_offsets = data.get("course_review_days_after", {})
+if not isinstance(saved_review_offsets, dict):
+    saved_review_offsets = {}
+data["course_review_days_after"] = {}
+for course_name in COURSE_COLORS:
+    try:
+        review_days_after = int(saved_review_offsets.get(course_name, 1))
+    except (TypeError, ValueError):
+        review_days_after = 1
+    data["course_review_days_after"][course_name] = min(2, max(0, review_days_after))
 if not isinstance(data.get("lecture_tasks"), list):
     data["lecture_tasks"] = []
 saved_theme = data.get("app_theme")
@@ -688,23 +861,55 @@ app_theme = dict(APP_THEME_DEFAULTS)
 for theme_key, theme_value in saved_theme.items():
     if theme_key in app_theme and isinstance(theme_value, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", theme_value):
         app_theme[theme_key] = theme_value.upper()
+if "hover" not in saved_theme:
+    saved_theme_background = saved_theme.get("background")
+    matching_palette = next(
+        (palette for palette in APP_THEME_PALETTES.values()
+         if isinstance(saved_theme_background, str)
+         and saved_theme_background.upper() == palette["background"]),
+        None,
+    )
+    if matching_palette:
+        app_theme["hover"] = matching_palette["hover"]
 data["app_theme"] = dict(app_theme)
-if st.session_state.pop("reset_app_theme_pending", False):
+if st.session_state.pop("refresh_theme_widgets_pending", False):
     for theme_widget_key in (
         "theme_background", "theme_sidebar", "theme_text", "theme_border",
         "theme_button", "theme_button_text", "theme_card", "theme_card_text",
-        "theme_input", "theme_surface",
+        "theme_input", "theme_surface", "theme_dropdown", "theme_progress", "theme_hover",
     ):
         st.session_state.pop(theme_widget_key, None)
 data.setdefault("planner_settings", {})
 
 st.markdown(f"""
 <style>
+    :root {{
+        --primary-color: {app_theme['button']};
+        --planner-background: {app_theme['background']};
+        --planner-sidebar: {app_theme['sidebar']};
+        --planner-text: {app_theme['text']};
+        --planner-button: {app_theme['button']};
+        --planner-button_text: {app_theme['button_text']};
+        --planner-card: {app_theme['card']};
+        --planner-card_text: {app_theme['card_text']};
+        --planner-input: {app_theme['input']};
+        --planner-border: {app_theme['border']};
+        --planner-surface: {app_theme['surface']};
+        --planner-dropdown: {app_theme['dropdown']};
+        --planner-progress: {app_theme['progress']};
+        --planner-hover: {app_theme['hover']};
+    }}
     .stApp, [data-testid="stAppViewContainer"] {{
+        --primary-color: {app_theme['button']} !important;
         background: {app_theme['background']} !important;
         color: {app_theme['text']} !important;
     }}
     [data-testid="stHeader"] {{ background: {app_theme['background']} !important; }}
+    #MainMenu, footer, .stDeployButton, [data-testid="stToolbar"],
+    [data-testid="stToolbarActions"], [data-testid="stDecoration"] {{
+        display: none !important;
+        visibility: hidden !important;
+    }}
     [data-testid="stSidebar"] {{
         background: {app_theme['sidebar']} !important;
         border-right-color: {app_theme['border']} !important;
@@ -716,6 +921,12 @@ st.markdown(f"""
     div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stCaptionContainer"],
     .stApp [data-testid="stExpander"] summary,
     .stApp [data-testid="stExpander"] summary p {{ color: {app_theme['text']} !important; }}
+    .stApp [data-testid="stExpander"] summary {{ background: {app_theme['dropdown']} !important; }}
+    .stApp [data-testid="stExpander"] details {{ background: {app_theme['surface']} !important; }}
+    .stApp [data-testid="stExpander"] details > summary,
+    div[data-testid="stExpander"] details > summary {{
+        background: {app_theme['dropdown']} !important;
+    }}
     [data-testid="stForm"], [data-testid="stAlert"],
     [data-testid="stFileUploaderDropzone"],
     div[data-testid="stExpander"],
@@ -723,10 +934,22 @@ st.markdown(f"""
         background: {app_theme['surface']} !important;
         border-color: {app_theme['border']} !important;
     }}
-    .stApp button, .stApp [data-testid="stFormSubmitButton"] button {{
+    .stApp button, .stApp [data-testid="stFormSubmitButton"] button,
+    .stApp button[kind="primary"], .stApp button[kind="secondary"] {{
         background: {app_theme['button']} !important;
         color: {app_theme['button_text']} !important;
         border-color: {app_theme['border']} !important;
+    }}
+    div[data-testid="stProgress"] > div > div {{
+        background: {app_theme['progress']} !important;
+    }}
+    div[data-testid="stMetric"] {{
+        background: {app_theme['card']} !important;
+        border-color: {app_theme['border']} !important;
+        color: {app_theme['card_text']} !important;
+    }}
+    div[data-testid="stMetricLabel"], div[data-testid="stMetricValue"] {{
+        color: {app_theme['card_text']} !important;
     }}
     .stApp input[type="checkbox"], .stApp input[type="radio"],
     .stApp [data-testid="stSlider"] [role="slider"] {{ accent-color: {app_theme['button']} !important; }}
@@ -749,11 +972,75 @@ st.markdown(f"""
     .stApp [data-testid="stTimeInput"] input,
     .stApp [data-testid="stTextArea"] textarea,
     .stApp [data-testid="stSelectbox"] [data-baseweb="select"] div,
-    .stApp [data-testid="stMultiSelect"] [data-baseweb="select"] div,
     .stApp [data-testid="stDateInput"] [data-baseweb="input"] div {{
         background-color: {app_theme['input']} !important;
         color: {app_theme['text']} !important;
         border-color: {app_theme['border']} !important;
+    }}
+    .stApp [data-testid="stSelectbox"] [data-baseweb="select"],
+    .stApp [data-testid="stSelectbox"] [data-baseweb="select"] > div,
+    .stApp [data-testid="stSelectbox"] [data-baseweb="select"] > div > div {{
+        background: {app_theme['dropdown']} !important;
+        background-color: {app_theme['dropdown']} !important;
+        color: {app_theme['text']} !important;
+    }}
+    .stApp [data-testid="stDateInput"] [data-baseweb="input"],
+    .stApp [data-testid="stDateInput"] [data-baseweb="input"] > div,
+    .stApp [data-testid="stDateInput"] [data-baseweb="input"] input {{
+        background: {app_theme['input']} !important;
+        background-color: {app_theme['input']} !important;
+        color: {app_theme['text']} !important;
+    }}
+    /* Streamlit/BaseWeb adds nested wrappers with their own default beige fill.
+       Theme every wrapper in these controls, then restore the intentional button
+       colors for dropdown arrows, date-picker icons, and weekday chips. */
+    .stApp [data-testid="stSelectbox"] [data-baseweb="select"] > div,
+    .stApp [data-testid="stSelectbox"] [data-baseweb="select"] > div > div,
+    .stApp [data-testid="stSelectbox"] [data-baseweb="select"] > div > div > div,
+    .stApp [data-testid="stSelectbox"] [data-baseweb="select"] > div *:not(button):not(svg),
+    .stApp [data-testid="stMultiSelect"] [data-baseweb="select"] > div,
+    .stApp [data-testid="stMultiSelect"] [data-baseweb="select"] > div > div,
+    .stApp [data-testid="stMultiSelect"] [data-baseweb="select"] > div > div > div,
+    .stApp [data-testid="stMultiSelect"] [data-baseweb="select"] > div *:not(button):not(svg) {{
+        background: {app_theme['dropdown']} !important;
+        background-color: {app_theme['dropdown']} !important;
+    }}
+    .stApp [data-testid="stSelectbox"] [data-baseweb="select"] button,
+    .stApp [data-testid="stMultiSelect"] [data-baseweb="select"] button {{
+        background: {app_theme['button']} !important;
+        background-color: {app_theme['button']} !important;
+        color: {app_theme['button_text']} !important;
+    }}
+    .stApp [data-testid="stDateInput"] [data-baseweb="input"] > div,
+    .stApp [data-testid="stDateInput"] [data-baseweb="input"] > div > div,
+    .stApp [data-testid="stDateInput"] [data-baseweb="input"] > div > div > div,
+    .stApp [data-testid="stDateInput"] [data-baseweb="input"] *:not(button):not(svg),
+    .stApp [data-testid="stDateInput"] [data-baseweb="input"] input {{
+        background: {app_theme['input']} !important;
+        background-color: {app_theme['input']} !important;
+    }}
+    .stApp [data-testid="stDateInput"] [data-baseweb="input"] button {{
+        background: {app_theme['surface']} !important;
+        background-color: {app_theme['surface']} !important;
+    }}
+    .stApp [data-testid="stMultiSelect"] [data-baseweb="tag"] {{
+        background: {app_theme['button']} !important;
+        background-color: {app_theme['button']} !important;
+        color: {app_theme['button_text']} !important;
+        border-radius: 8px !important;
+    }}
+    .stApp [data-testid="stMultiSelect"] [data-baseweb="tag"] *,
+    .stApp [data-testid="stMultiSelect"] [data-baseweb="tag"] button,
+    .stApp [data-testid="stMultiSelect"] [data-baseweb="tag"] svg {{
+        background: transparent !important;
+        color: {app_theme['button_text']} !important;
+        fill: {app_theme['button_text']} !important;
+    }}
+    .stApp [data-testid="stMultiSelect"] input {{
+        background: transparent !important;
+        color: {app_theme['text']} !important;
+        min-width: 2px !important;
+        width: auto !important;
     }}
     .stApp [data-testid="stTextInput"] [data-baseweb="input"]:focus-within,
     .stApp [data-testid="stNumberInput"] [data-baseweb="input"]:focus-within,
@@ -766,20 +1053,54 @@ st.markdown(f"""
     }}
     .stApp [data-baseweb="popover"] [role="listbox"],
     .stApp [data-baseweb="popover"] [role="option"] {{
-        background: {app_theme['input']} !important;
+        background: {app_theme['dropdown']} !important;
         color: {app_theme['text']} !important;
     }}
     .stApp [data-baseweb="popover"] [role="option"]:hover,
     .stApp [data-baseweb="popover"] [aria-selected="true"] {{
-        background: {app_theme['surface']} !important;
+        background: {app_theme['hover']} !important;
         color: {app_theme['text']} !important;
+    }}
+    .stApp button:hover,
+    .stApp [role="button"]:hover,
+    .stApp [role="gridcell"]:hover,
+    .stApp [data-baseweb="popover"] [role="option"]:hover,
+    .stApp [data-baseweb="popover"] [aria-selected="true"],
+    .stApp [data-testid="stExpander"] summary:hover,
+    .stApp [data-testid="stExpander"] details > summary:hover,
+    div[data-testid="stExpander"] details > summary:hover,
+    .stApp details > summary:hover,
+    .stApp [data-testid="stSelectbox"] [data-baseweb="select"]:hover,
+    .stApp [data-testid="stSelectbox"] [data-baseweb="select"] > div:hover,
+    .stApp [data-testid="stMultiSelect"] [data-baseweb="select"]:hover,
+    .stApp [data-testid="stMultiSelect"] [data-baseweb="select"] > div:hover,
+    .stApp [data-testid="stDateInput"] [data-baseweb="input"]:hover,
+    .stApp [data-testid="stNumberInput"] [data-baseweb="input"]:hover,
+    .stApp [data-testid="stTextInput"] [data-baseweb="input"]:hover,
+    .stApp [data-testid="stTextArea"] [data-baseweb="textarea"]:hover,
+    .stApp [data-testid="stNumberInput"] button:hover,
+    .stApp [data-testid="stTimeInput"] button:hover,
+    .stApp [data-testid="stDateInput"] button:hover,
+    .stApp [data-testid="stMultiSelect"] [data-baseweb="tag"] button:hover,
+    .stApp [data-testid="stSidebar"] button:hover,
+    .stApp [data-testid="stForm"] button:hover,
+    .stApp [data-testid="stFileUploaderDropzone"]:hover,
+    .stApp [data-testid="stFileUploaderDropzone"] button:hover {{
+        background: {app_theme['hover']} !important;
+        background-color: {app_theme['hover']} !important;
+        color: {app_theme['text']} !important;
+    }}
+    .stApp button:hover *,
+    .stApp [role="button"]:hover * {{
+        color: {app_theme['text']} !important;
+        fill: {app_theme['text']} !important;
     }}
     .assignment-card {{
         background: {app_theme['card']} !important;
         border-color: {app_theme['border']} !important;
         color: {app_theme['card_text']} !important;
     }}
-    .assignment-card.due-today {{ border-color: #C96F59 !important; }}
+    .assignment-card.due-today {{ border-color: {app_theme['button']} !important; }}
     .assignment-card .target-number, .assignment-card .target-unit,
     .assignment-card .target-label, .assignment-card .assignment-meta,
     .assignment-card .historical-progress {{ color: {app_theme['card_text']} !important; }}
@@ -787,17 +1108,50 @@ st.markdown(f"""
         background: {app_theme['surface']} !important;
         border-color: {app_theme['border']} !important;
     }}
+    /* BaseWeb's control markup differs between Streamlit releases. These
+       palette rules target the rendered BaseWeb elements directly, without
+       relying on Streamlit's changing widget test IDs. */
+    .stApp [data-baseweb="select"],
+    .stApp [data-baseweb="select"] > div,
+    .stApp [data-baseweb="select"] > div > div:first-child,
+    .stApp [data-baseweb="select"] > div > div:first-child > div {{
+        background-color: {app_theme['dropdown']} !important;
+    }}
+    .stApp [data-baseweb="tag"] {{
+        background: {app_theme['button']} !important;
+        background-color: {app_theme['button']} !important;
+        color: {app_theme['button_text']} !important;
+    }}
+    .stApp [data-baseweb="tag"] * {{
+        background: transparent !important;
+        color: {app_theme['button_text']} !important;
+        fill: {app_theme['button_text']} !important;
+    }}
+    .stApp [data-baseweb="input"],
+    .stApp [data-baseweb="input"] > div,
+    .stApp [data-baseweb="input"] > div > div,
+    .stApp [data-baseweb="input"] input,
+    .stApp [data-baseweb="input"] textarea {{
+        background-color: {app_theme['input']} !important;
+        color: {app_theme['text']} !important;
+    }}
+    .stApp [data-baseweb="input"] button {{
+        background-color: {app_theme['surface']} !important;
+        color: {app_theme['text']} !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
+saved_planner_settings = data.get("planner_settings", {})
+if not isinstance(saved_planner_settings, dict):
+    saved_planner_settings = {}
 try:
-    saved_wake_start = time.fromisoformat(data["planner_settings"].get("wake_start", DEFAULT_WAKE_START.isoformat()))
+    ignore_gap_minutes = min(120, max(0, int(saved_planner_settings.get("ignore_gap_minutes", 30))))
 except (TypeError, ValueError):
-    saved_wake_start = DEFAULT_WAKE_START
-try:
-    saved_wake_end = time.fromisoformat(data["planner_settings"].get("wake_end", DEFAULT_WAKE_END.isoformat()))
-except (TypeError, ValueError):
-    saved_wake_end = DEFAULT_WAKE_END
+    ignore_gap_minutes = 30
+settings = {"ignore_gap_minutes": ignore_gap_minutes}
+data["planner_settings"] = {"ignore_gap_minutes": ignore_gap_minutes}
+data.pop("daily_availability_overrides", None)
 
 st.title("Assignment Planner")
 st.caption("A local study planner that uses your exported calendar and dynamically redistributes work.")
@@ -831,47 +1185,11 @@ with st.sidebar:
             save_data(data)
             st.rerun()
     else:
-        st.info("No calendar imported. The app will use your fallback availability settings.")
+        st.info("No calendar imported. Free-time estimates start at 16 hours per day after reserving 8 hours for sleep.")
 
     st.divider()
-    with st.expander("Availability settings", expanded=False):
-        weekday_fallback = st.number_input(
-            "Default weekday free hours (no calendar)", 0.0, 24.0,
-            float(data["planner_settings"].get("weekday_fallback", 4.0)), 0.5,
-        )
-        weekend_fallback = st.number_input(
-            "Default weekend free hours (no calendar)", 0.0, 24.0,
-            float(data["planner_settings"].get("weekend_fallback", 6.0)), 0.5,
-        )
-        ignore_gap = st.number_input(
-            "Ignore calendar gaps up to (minutes)", 0, 120,
-            int(data["planner_settings"].get("ignore_gap_minutes", 30)), 5,
-        )
-        st.caption(
-            "Recurring calendar events are expanded for the next year. Gaps up to "
-            f"{ignore_gap:g} minutes are counted as part of class time."
-        )
-        wake_start = st.time_input("Waking day starts", saved_wake_start)
-        wake_end = st.time_input("Waking day ends", saved_wake_end)
 
-settings = {
-    "weekday_fallback": weekday_fallback,
-    "weekend_fallback": weekend_fallback,
-    "ignore_gap_minutes": ignore_gap,
-    "wake_start": wake_start,
-    "wake_end": wake_end,
-}
-data["planner_settings"] = {
-    "weekday_fallback": weekday_fallback,
-    "weekend_fallback": weekend_fallback,
-    "ignore_gap_minutes": ignore_gap,
-    "wake_start": wake_start.isoformat(timespec="minutes"),
-    "wake_end": wake_end.isoformat(timespec="minutes"),
-}
-save_data(data)
-
-# Date-by-date availability estimates and manual overrides.
-data.setdefault("daily_availability_overrides", {})
+# Read-only date-by-date availability estimates.
 today_for_availability = date.today()
 due_dates = []
 for assignment in data.get("assignments", []):
@@ -885,63 +1203,23 @@ last_availability_day = max(
 )
 last_availability_day = min(last_availability_day, today_for_availability + timedelta(days=59))
 
-daily_availability = {}
 with st.sidebar:
-    with st.expander("Daily availability · inspect and edit", expanded=True):
-        st.caption(
-            "Estimate is free time inside your waking hours after calendar events. "
-            "Edit 'Your hours' for any date to override it."
-        )
-        if st.button("Reset all dates to estimates", key="reset_daily_availability"):
-            data["daily_availability_overrides"] = {}
-            for state_key in list(st.session_state):
-                if state_key.startswith("daily_hours_"):
-                    del st.session_state[state_key]
-            save_data(data)
-            st.rerun()
-
-        header = st.columns([1.45, 0.85, 1.0, 0.42])
+    with st.expander("Free time per day", expanded=True):
+        st.caption("Calendar events and short gaps count as busy time; 8 hours are reserved each day for sleep.")
+        header = st.columns([1.4, 1])
         header[0].markdown("**Date**")
-        header[1].markdown("**Estimate**")
-        header[2].markdown("**Your hours**")
+        header[1].markdown("**Free time**")
         current_day = today_for_availability
         while current_day <= last_availability_day:
-            day_key = current_day.isoformat()
             estimate = get_calendar_estimate_hours(
                 current_day, settings, data["calendar_events"], bool(data["calendar_name"])
             )
-            saved_value = data["daily_availability_overrides"].get(day_key)
-            initial_value = float(saved_value) if saved_value is not None else round(estimate, 1)
-            row = st.columns([1.45, 0.85, 1.0, 0.42])
+            row = st.columns([1.4, 1])
             row[0].write(current_day.strftime("%a %b ") + str(current_day.day))
             row[1].write(f"{estimate:.1f} h")
-            chosen_value = row[2].number_input(
-                f"Available hours on {day_key}",
-                min_value=0.0, max_value=24.0,
-                value=min(24.0, max(0.0, initial_value)),
-                step=0.5, key=f"daily_hours_{day_key}",
-                label_visibility="collapsed",
-            )
-            if saved_value is not None and row[3].button(
-                "↺", key=f"reset_daily_hours_{day_key}",
-                help="Reset this date to its calendar estimate",
-            ):
-                data["daily_availability_overrides"].pop(day_key, None)
-                st.session_state.pop(f"daily_hours_{day_key}", None)
-                save_data(data)
-                st.rerun()
-            if abs(float(chosen_value) - float(estimate)) > 0.01:
-                daily_availability[day_key] = float(chosen_value)
             current_day += timedelta(days=1)
 
-data["daily_availability_overrides"] = daily_availability
-settings["daily_availability"] = daily_availability
 save_data(data)
-
-if wake_end <= wake_start:
-    st.error("The waking-day end must be later than the waking-day start.")
-    st.stop()
-
 today = date.today()
 
 # Create class-prep tasks for the next lecture and notes-review tasks for the
@@ -950,20 +1228,52 @@ lecture_tasks_by_key = {
     task.get("id"): task for task in data["lecture_tasks"]
     if isinstance(task, dict) and task.get("id")
 }
+courses_without_prep = {
+    course_name for course_name, prep_offset in data["course_prep_days_before"].items()
+    if prep_offset < 0
+}
+if courses_without_prep:
+    data["lecture_tasks"] = [
+        task for task in data["lecture_tasks"]
+        if not (
+            task.get("course") in courses_without_prep
+            and task.get("type") == "lecture_prep"
+            and not task.get("completed")
+        )
+    ]
+    lecture_tasks_by_key = {
+        task.get("id"): task for task in data["lecture_tasks"]
+        if isinstance(task, dict) and task.get("id")
+    }
 for course_name, meeting_days in data["course_meeting_days"].items():
+    prep_days_before = data["course_prep_days_before"].get(course_name, 1)
+    review_days_after = data["course_review_days_after"].get(course_name, 1)
     # Generate a short rolling window so Schedule can show upcoming work too.
     for day_offset in range(-1, 22):
         class_date = today + timedelta(days=day_offset)
         if class_date.strftime("%A") not in meeting_days:
             continue
-        for task_type, due_date in (
-            ("lecture_prep", class_date - timedelta(days=1)),
-            ("lecture_notes_review", class_date + timedelta(days=1)),
-        ):
-            if due_date < today:
-                continue
+        task_types = ["lecture_notes_review"]
+        if prep_days_before >= 0:
+            task_types.insert(0, "lecture_prep")
+        for task_type in task_types:
+            if task_type == "lecture_prep":
+                target_due_date = class_date - timedelta(days=prep_days_before)
+                # If the prep window has already started, keep the work due today.
+                due_date = max(today, target_due_date)
+                if class_date < today and target_due_date < today:
+                    continue
+            else:
+                due_date = class_date + timedelta(days=review_days_after)
+                if due_date < today:
+                    continue
             task_id = f"{course_name}|{task_type}|{class_date.isoformat()}"
-            if task_id not in lecture_tasks_by_key:
+            existing_task = lecture_tasks_by_key.get(task_id)
+            if existing_task:
+                if not existing_task.get("completed") and class_date >= today:
+                    existing_task["due_date"] = due_date.isoformat()
+                continue
+            else:
                 task = {
                     "id": task_id,
                     "course": course_name,
@@ -992,46 +1302,6 @@ data["lecture_tasks"] = [
 ]
 save_data(data)
 
-# Bulk assignment import
-with st.expander("Import assignments in bulk (JSON)", expanded=False):
-    st.write("Upload a JSON file or paste a JSON list. Required fields: name, total_units, due_date. Optional: completed_units, unit.")
-    json_upload = st.file_uploader("Choose assignments JSON", type=["json"], key="bulk_json_upload")
-    pasted_json = st.text_area(
-        "Or paste JSON here",
-        height=140,
-        placeholder='[{"name":"Example Assignment","total_units":12,"completed_units":4,"unit":"Questions","due_date":"2026-10-06"}]',
-        key="bulk_json_text",
-    )
-    if st.button("Import assignments", type="primary", key="bulk_import_button"):
-        try:
-            if json_upload is not None:
-                payload = json.loads(json_upload.getvalue().decode("utf-8-sig"))
-            elif pasted_json.strip():
-                payload = json.loads(pasted_json)
-            else:
-                raise ValueError("Choose a JSON file or paste JSON first.")
-
-            incoming = normalize_imported_assignments(payload, today)
-            existing_keys = {
-                (a.get("name", "").strip().casefold(), a.get("due_date"))
-                for a in data["assignments"]
-            }
-            added = 0
-            skipped = 0
-            for assignment in incoming:
-                key = (assignment["name"].casefold(), assignment["due_date"])
-                if key in existing_keys:
-                    skipped += 1
-                    continue
-                data["assignments"].append(assignment)
-                existing_keys.add(key)
-                added += 1
-            save_data(data)
-            st.success(f"Imported {added} assignment(s)." + (f" Skipped {skipped} duplicate(s)." if skipped else ""))
-            st.rerun()
-        except Exception as exc:
-            st.error(f"Import failed: {exc}")
-
 # Assignment creation
 with st.expander("＋ Add an assignment", expanded=not data["assignments"]):
     # Keep this selector outside the form so changing it immediately switches fields.
@@ -1041,46 +1311,158 @@ with st.expander("＋ Add an assignment", expanded=not data["assignments"]):
         horizontal=True,
         key="new_assignment_mode",
     )
-    with st.form("new_assignment", clear_on_submit=True):
-        name = st.text_input("Assignment name")
-        course = st.selectbox("Course / category", COURSES, key="new_course")
-        col1, col2 = st.columns(2)
-        start_date = col1.date_input("Start date", value=today, min_value=today)
-        due_date = col2.date_input("End date / due date", value=today + timedelta(days=7), min_value=today)
+    if st.session_state.pop("reset_recurring_assignment_form", False):
+        for state_key in list(st.session_state):
+            if state_key.startswith(("recurring_name_", "recurring_due_", "recurring_start_")):
+                st.session_state.pop(state_key, None)
+        for state_key in (
+            "recurring_occurrences",
+            "recurring_course", "recurring_total_units", "recurring_unit",
+            "recurring_completed_units", "recurring_completed_percent",
+            "new_assignment_recurring",
+        ):
+            st.session_state.pop(state_key, None)
+
+    recurring = st.checkbox("This assignment repeats", key="new_assignment_recurring")
+    if recurring:
+        occurrence_count = int(st.number_input(
+            "Number of due dates", min_value=2, max_value=20, value=2, step=1,
+            key="recurring_occurrences",
+        ))
+        course = st.selectbox("Course / category", COURSES, key="recurring_course")
+
         if mode.startswith("Units"):
-            col3, col4, col5 = st.columns(3)
-            total_units = col3.number_input("Total units", min_value=1, value=10, step=1)
-            unit = col4.selectbox("Unit type", ["Questions", "Pages", "Chapters", "Problems", "Other"])
-            completed_before = col5.number_input("Already completed", min_value=0, value=0, step=1)
-            completed_today = 0
+            unit_columns = st.columns(3)
+            total_units = unit_columns[0].number_input(
+                "Total units for each", min_value=1, value=10, step=1,
+                key="recurring_total_units",
+            )
+            unit = unit_columns[1].selectbox(
+                "Unit type", ["Questions", "Pages", "Chapters", "Problems", "Other"],
+                key="recurring_unit",
+            )
+            completed_before = unit_columns[2].number_input(
+                "Already completed for each", min_value=0, value=0, step=1,
+                key="recurring_completed_units",
+            )
+            completed_percent = 0
         else:
-            completed_percent = st.number_input("Current completion (%)", min_value=0, max_value=100, value=0, step=1)
-        submitted = st.form_submit_button("Save assignment", type="primary")
-        if submitted:
-            if not name.strip():
-                st.error("Enter an assignment name.")
-            elif due_date < start_date:
-                st.error("End date must be on or after the start date.")
+            total_units = 0
+            unit = "Questions"
+            completed_before = 0
+            completed_percent = st.number_input(
+                "Current completion for each (%)", min_value=0, max_value=100, value=0, step=1,
+                key="recurring_completed_percent",
+            )
+
+        st.caption("Add a name, start date, and due date for each assignment. Each start date defaults to the previous assignment's due date, and you can change any date.")
+        occurrence_names = []
+        occurrence_starts = []
+        occurrence_dues = []
+        for occurrence_index in range(occurrence_count):
+            previous_due = occurrence_dues[-1] if occurrence_dues else None
+            default_due = (previous_due + timedelta(days=7)) if previous_due else today + timedelta(days=7)
+            name_col, start_col, due_col = st.columns([1.6, 1, 1])
+            occurrence_number = occurrence_index + 1
+            occurrence_names.append(name_col.text_input(
+                f"Assignment {occurrence_number} name",
+                key=f"recurring_name_{occurrence_index}",
+            ))
+            start_key = f"recurring_start_{occurrence_index}"
+            auto_start = previous_due if previous_due else today
+            last_auto_start = st.session_state.get(f"{start_key}_auto")
+            current_start = st.session_state.get(start_key)
+            if current_start is None or current_start == last_auto_start:
+                st.session_state[start_key] = auto_start
+            st.session_state[f"{start_key}_auto"] = auto_start
+            start_date = start_col.date_input("Start date", key=start_key)
+            occurrence_starts.append(start_date)
+            occurrence_dues.append(due_col.date_input(
+                "Due date", value=default_due, key=f"recurring_due_{occurrence_index}",
+            ))
+
+        if st.button("Save recurring assignments", type="primary", key="save_recurring_assignments"):
+            validation_error = None
+            if any(not assignment_name.strip() for assignment_name in occurrence_names):
+                validation_error = "Enter a name for every assignment."
             elif mode.startswith("Units") and completed_before > total_units:
-                st.error("Completed units cannot exceed total units.")
+                validation_error = "Completed units cannot exceed the total units for each assignment."
             else:
-                assignment = {
-                    "id": str(uuid.uuid4()), "name": name.strip(), "course": course,
-                    "mode": "units" if mode.startswith("Units") else "percentage",
-                    "start_date": start_date.isoformat(), "due_date": due_date.isoformat(),
-                    "today_completed": 0, "today_date": today.isoformat(),
-                }
-                if mode.startswith("Units"):
-                    assignment.update({
-                        "total_units": int(total_units), "unit": unit,
-                        "completed_units": int(completed_before),
-                    })
-                else:
-                    assignment.update({"completed_percent": int(completed_percent)})
-                data["assignments"].append(assignment)
+                for occurrence_index, (start_date, due_date) in enumerate(zip(occurrence_starts, occurrence_dues)):
+                    if due_date < start_date:
+                        validation_error = f"Assignment {occurrence_index + 1} is due before its start date."
+                        break
+                    if occurrence_index and due_date < occurrence_dues[occurrence_index - 1]:
+                        validation_error = "Keep the due dates in order from earliest to latest."
+                        break
+
+            if validation_error:
+                st.error(validation_error)
+            else:
+                series_id = str(uuid.uuid4())
+                for occurrence_index, (assignment_name, start_date, due_date) in enumerate(
+                    zip(occurrence_names, occurrence_starts, occurrence_dues), start=1
+                ):
+                    assignment = {
+                        "id": str(uuid.uuid4()), "name": assignment_name.strip(), "course": course,
+                        "mode": "units" if mode.startswith("Units") else "percentage",
+                        "start_date": start_date.isoformat(), "due_date": due_date.isoformat(),
+                        "today_completed": 0, "today_date": today.isoformat(),
+                        "recurring_group_id": series_id,
+                        "recurring_occurrence": occurrence_index,
+                    }
+                    if mode.startswith("Units"):
+                        assignment.update({
+                            "total_units": int(total_units), "unit": unit,
+                            "completed_units": int(completed_before),
+                        })
+                    else:
+                        assignment.update({"completed_percent": int(completed_percent)})
+                    data["assignments"].append(assignment)
                 save_data(data)
-                st.success("Assignment saved.")
+                st.session_state["reset_recurring_assignment_form"] = True
+                st.success(f"Saved {occurrence_count} recurring assignments.")
                 st.rerun()
+    else:
+        with st.form("new_assignment", clear_on_submit=True):
+            name = st.text_input("Assignment name")
+            course = st.selectbox("Course / category", COURSES, key="new_course")
+            col1, col2 = st.columns(2)
+            start_date = col1.date_input("Start date", value=today, min_value=today)
+            due_date = col2.date_input("End date / due date", value=today + timedelta(days=7), min_value=today)
+            if mode.startswith("Units"):
+                col3, col4, col5 = st.columns(3)
+                total_units = col3.number_input("Total units", min_value=1, value=10, step=1)
+                unit = col4.selectbox("Unit type", ["Questions", "Pages", "Chapters", "Problems", "Other"])
+                completed_before = col5.number_input("Already completed", min_value=0, value=0, step=1)
+            else:
+                completed_percent = st.number_input("Current completion (%)", min_value=0, max_value=100, value=0, step=1)
+            submitted = st.form_submit_button("Save assignment", type="primary")
+            if submitted:
+                if not name.strip():
+                    st.error("Enter an assignment name.")
+                elif due_date < start_date:
+                    st.error("End date must be on or after the start date.")
+                elif mode.startswith("Units") and completed_before > total_units:
+                    st.error("Completed units cannot exceed total units.")
+                else:
+                    assignment = {
+                        "id": str(uuid.uuid4()), "name": name.strip(), "course": course,
+                        "mode": "units" if mode.startswith("Units") else "percentage",
+                        "start_date": start_date.isoformat(), "due_date": due_date.isoformat(),
+                        "today_completed": 0, "today_date": today.isoformat(),
+                    }
+                    if mode.startswith("Units"):
+                        assignment.update({
+                            "total_units": int(total_units), "unit": unit,
+                            "completed_units": int(completed_before),
+                        })
+                    else:
+                        assignment.update({"completed_percent": int(completed_percent)})
+                    data["assignments"].append(assignment)
+                    save_data(data)
+                    st.success("Assignment saved.")
+                    st.rerun()
 
 # Progress rollover and remaining work
 for assignment in data["assignments"]:
@@ -1113,8 +1495,8 @@ remaining_assignments = [
 ]
 today_items = plan.get(today.isoformat(), [])
 
-tab_today, tab_assignments, tab_class_test_prep, tab_schedule, tab_settings = st.tabs(
-    ["Today", "Assignments", "Class & Test Prep", "Schedule", "Data"]
+tab_today, tab_assignments, tab_class_test_prep, tab_schedule, tab_courses, tab_appearance = st.tabs(
+    ["Today", "Assignments", "Class & Test Prep", "Schedule", "Courses", "Appearance"]
 )
 
 with tab_today:
@@ -1265,6 +1647,7 @@ with tab_today:
                         if float(amount) > previous_today:
                             st.session_state["show_progress_celebration"] = True
                         save_data(data)
+                        st.toast("Progress updated.", icon="✅")
                         st.rerun()
 
 with tab_assignments:
@@ -1354,7 +1737,7 @@ with tab_assignments:
 
 with tab_class_test_prep:
     st.subheader("Class & Test Prep")
-    st.caption("Manage course topics here. Choose a class date from the meeting days configured in Data, then add, edit, or remove topics.")
+    st.caption("Manage course topics here. Choose a class date from the meeting days configured in Courses, then add, edit, or remove topics.")
 
     selected_topic_course = st.selectbox(
         "Choose a class", COURSES, key="topic_manager_course",
@@ -1385,7 +1768,7 @@ with tab_class_test_prep:
                 key=f"add_topic_class_date_{COURSES.index(selected_topic_course)}",
             )
             if not selected_meeting_days:
-                st.info("Set this course's meeting days in the Data tab before adding a dated topic.")
+                st.info("Set this course's meeting days in the Courses tab before adding a dated topic.")
             add_topic = st.form_submit_button("Add topic", type="primary")
             cancel_topic = st.form_submit_button("Cancel")
             if add_topic:
@@ -1393,9 +1776,9 @@ with tab_class_test_prep:
                 if not normalized_topic_name:
                     st.error("Enter a topic name.")
                 elif not selected_meeting_days:
-                    st.error("Set this course's meeting days in the Data tab first.")
+                    st.error("Set this course's meeting days in the Courses tab first.")
                 elif topic_class_date.strftime("%A") not in selected_meeting_days:
-                    st.error("Choose a class date that matches this course's meeting days in the Data tab.")
+                    st.error("Choose a class date that matches this course's meeting days in the Courses tab.")
                 elif any(topic["name"].casefold() == normalized_topic_name.casefold() for topic in selected_topics):
                     st.error("That topic is already listed for this class.")
                 else:
@@ -1433,7 +1816,7 @@ with tab_class_test_prep:
                     "Class date", value=default_edit_class_date, key=f"edit_topic_class_date_{topic['id']}",
                 )
                 if not topic_meeting_days:
-                    date_col.caption("Set meeting days in Data to choose a date.")
+                    date_col.caption("Set meeting days in Courses to choose a date.")
                 save_topic = save_col.form_submit_button("Save")
                 delete_topic = delete_col.form_submit_button("Delete")
                 if save_topic:
@@ -1448,9 +1831,9 @@ with tab_class_test_prep:
                     elif duplicate_topic:
                         st.error("That topic is already listed for this class.")
                     elif not topic_meeting_days:
-                        st.error("Set this course's meeting days in the Data tab first.")
+                        st.error("Set this course's meeting days in the Courses tab first.")
                     elif edited_class_date.strftime("%A") not in topic_meeting_days:
-                        st.error("Choose a class date that matches this course's meeting days in the Data tab.")
+                        st.error("Choose a class date that matches this course's meeting days in the Courses tab.")
                     else:
                         topic["name"] = normalized_topic_name
                         topic["class_date"] = edited_class_date.isoformat()
@@ -1492,7 +1875,10 @@ with tab_class_test_prep:
         )
 
 with tab_schedule:
-    st.subheader("Upcoming daily workload")
+    st.subheader("Schedule")
+    schedule_view_mode = st.radio(
+        "Schedule view", ["List", "Calendar"], horizontal=True, key="schedule_view_mode"
+    )
     day_info_by_key = {info["date"].isoformat(): info for info in day_rows[:21]}
     lecture_tasks_by_day = {}
     for lecture_task in data["lecture_tasks"]:
@@ -1508,71 +1894,181 @@ with tab_schedule:
     schedule_day_keys.update((today + timedelta(days=day_offset)).isoformat() for day_offset in range(7))
     schedule_day_keys.update(lecture_tasks_by_day)
 
-    if not schedule_day_keys:
-        st.info("Add an assignment to build your schedule.")
-    else:
-        for day_key in sorted(schedule_day_keys):
-            day = date.fromisoformat(day_key)
-            items = plan.get(day_key, [])
-            day_info = day_info_by_key.get(day_key, {})
-            with st.container(border=True):
-                st.write(f"**{day.strftime('%A, %b %d')}**")
-                if day_info:
-                    planned_units = sum(item.get("units", 0) for item in items)
-                    planned_percent = sum(item.get("percent", 0) for item in items)
-                    summary = []
-                    if planned_units: summary.append(f"{planned_units} units")
-                    if planned_percent: summary.append(f"{planned_percent}%")
-                    st.caption(
-                        f"Available: {day_info.get('free_hours', 0):.1f} h  ·  Assignments: "
-                        + (" · ".join(summary) if summary else "None")
-                    )
-
-                if items:
-                    st.markdown("**Assignments**")
-                    for item in items:
-                        linked_assignment = next((a for a in data["assignments"] if a["id"] == item["assignment_id"]), None)
-                        item_is_due = bool(linked_assignment and date.fromisoformat(linked_assignment["due_date"]) == day)
-                        if item.get("mode") == "percentage":
-                            detail = f"{item['percent']}%"
-                        else:
-                            item_unit = item["unit"].lower()
-                            if int(item["units"]) == 1 and item_unit.endswith("s"): item_unit = item_unit[:-1]
-                            elif int(item["units"]) != 1 and not item_unit.endswith("s"): item_unit += "s"
-                            detail = f"{item['units']} {item_unit}"
-                        if item_is_due:
-                            st.markdown(f'<div style="color:#ff7777;font-weight:750;">• {html.escape(item["name"])}: {detail} — DUE TODAY</div>', unsafe_allow_html=True)
-                        else:
-                            st.write(f"• {item['name']}: {detail}")
-
-                class_tasks = lecture_tasks_by_day.get(day_key, [])
-                if class_tasks:
-                    st.markdown("**Class prep & review**")
-                    class_tasks.sort(key=lambda task: (task.get("type") != "lecture_prep", task.get("course", "")))
-                    for lecture_task in class_tasks:
-                        course_name = lecture_task.get("course", "")
-                        course_color = COURSE_COLORS.get(course_name, app_theme["border"])
-                        class_date = date.fromisoformat(lecture_task["class_date"])
-                        title = "Lecture prep" if lecture_task.get("type") == "lecture_prep" else "Lecture notes review"
-                        related_topics = [
-                            topic["name"] for topic in data["class_topics"].get(course_name, [])
-                            if topic.get("class_date") == class_date.isoformat()
-                        ]
-                        detail = ", ".join(related_topics) if related_topics else f"Class on {class_date.strftime('%a, %b %d')}"
-                        if lecture_task.get("completed"):
-                            status = "✓ Done"
-                            if lecture_task.get("type") == "lecture_notes_review" and lecture_task.get("review_color"):
-                                status += f" · {lecture_task['review_color']}"
-                        elif day > today:
-                            status = "Upcoming"
-                        else:
-                            status = "Mark done in Today"
-                        st.markdown(
-                            f'<div style="border-left:4px solid {course_color};padding:3px 9px;margin:2px 0 6px 0;">'
-                            f'<span style="color:{course_color};font-weight:750;">{html.escape(course_name)}</span> · '
-                            f'{title} · {html.escape(detail)} <span style="opacity:.7;">({status})</span></div>',
-                            unsafe_allow_html=True,
+    if schedule_view_mode == "List":
+        st.caption("Upcoming assignments, lecture prep, and lecture reviews.")
+        if not schedule_day_keys:
+            st.info("Add an assignment to build your schedule.")
+        else:
+            for day_key in sorted(schedule_day_keys):
+                day = date.fromisoformat(day_key)
+                items = plan.get(day_key, [])
+                day_info = day_info_by_key.get(day_key, {})
+                with st.container(border=True):
+                    st.write(f"**{day.strftime('%A, %b %d')}**")
+                    if day_info:
+                        planned_units = sum(item.get("units", 0) for item in items)
+                        planned_percent = sum(item.get("percent", 0) for item in items)
+                        summary = []
+                        if planned_units: summary.append(f"{planned_units} units")
+                        if planned_percent: summary.append(f"{planned_percent}%")
+                        st.caption(
+                            f"Available: {day_info.get('free_hours', 0):.1f} h  ·  Assignments: "
+                            + (" · ".join(summary) if summary else "None")
                         )
+
+                    if items:
+                        st.markdown("**Assignments**")
+                        for item in items:
+                            linked_assignment = next((a for a in data["assignments"] if a["id"] == item["assignment_id"]), None)
+                            item_is_due = bool(linked_assignment and date.fromisoformat(linked_assignment["due_date"]) == day)
+                            if item.get("mode") == "percentage":
+                                detail = f"{item['percent']}%"
+                            else:
+                                item_unit = item["unit"].lower()
+                                if int(item["units"]) == 1 and item_unit.endswith("s"): item_unit = item_unit[:-1]
+                                elif int(item["units"]) != 1 and not item_unit.endswith("s"): item_unit += "s"
+                                detail = f"{item['units']} {item_unit}"
+                            if item_is_due:
+                                st.markdown(f'<div style="color:{app_theme["button"]};font-weight:750;">• {html.escape(item["name"])}: {detail} — DUE TODAY</div>', unsafe_allow_html=True)
+                            else:
+                                st.write(f"• {item['name']}: {detail}")
+
+                    class_tasks = lecture_tasks_by_day.get(day_key, [])
+                    if class_tasks:
+                        st.markdown("**Class prep & review**")
+                        class_tasks.sort(key=lambda task: (task.get("type") != "lecture_prep", task.get("course", "")))
+                        for lecture_task in class_tasks:
+                            course_name = lecture_task.get("course", "")
+                            course_color = COURSE_COLORS.get(course_name, app_theme["border"])
+                            try:
+                                class_date = date.fromisoformat(lecture_task["class_date"])
+                            except (KeyError, TypeError, ValueError):
+                                class_date = day
+                            title = "Lecture prep" if lecture_task.get("type") == "lecture_prep" else "Lecture notes review"
+                            related_topics = [
+                                topic["name"] for topic in data["class_topics"].get(course_name, [])
+                                if topic.get("class_date") == class_date.isoformat()
+                            ]
+                            detail = ", ".join(related_topics) if related_topics else f"Class on {class_date.strftime('%a, %b %d')}"
+                            if lecture_task.get("completed"):
+                                status = "✓ Done"
+                                if lecture_task.get("type") == "lecture_notes_review" and lecture_task.get("review_color"):
+                                    status += f" · {lecture_task['review_color']}"
+                            elif day > today:
+                                status = "Upcoming"
+                            else:
+                                status = "Mark done in Today"
+                            st.markdown(
+                                f'<div style="border-left:4px solid {course_color};padding:3px 9px;margin:2px 0 6px 0;">'
+                                f'<span style="color:{course_color};font-weight:750;">{html.escape(course_name)}</span> · '
+                                f'{title} · {html.escape(detail)} <span style="opacity:.7;">({status})</span></div>',
+                                unsafe_allow_html=True,
+                            )
+    else:
+        if not isinstance(st.session_state.get("schedule_calendar_anchor"), date):
+            st.session_state["schedule_calendar_anchor"] = today
+        calendar_period = st.radio(
+            "Calendar view", ["Week", "Month"], horizontal=True, key="schedule_calendar_period"
+        )
+        previous_col, date_col, today_col, next_col = st.columns([1, 2.8, 1, 1])
+        with previous_col:
+            st.button(
+                "‹ Previous", key="schedule_calendar_previous",
+                on_click=shift_schedule_calendar_anchor, args=(-1,),
+            )
+        with date_col:
+            st.date_input(
+                "Choose a date", key="schedule_calendar_anchor", label_visibility="collapsed"
+            )
+        with today_col:
+            st.button("Today", key="schedule_calendar_today", on_click=set_schedule_calendar_anchor_today)
+        with next_col:
+            st.button(
+                "Next ›", key="schedule_calendar_next",
+                on_click=shift_schedule_calendar_anchor, args=(1,),
+            )
+
+        anchor = st.session_state["schedule_calendar_anchor"]
+        if calendar_period == "Week":
+            week_start = anchor - timedelta(days=anchor.weekday())
+            calendar_days = [week_start + timedelta(days=offset) for offset in range(7)]
+            st.caption(f"{calendar_days[0].strftime('%b %d')} – {calendar_days[-1].strftime('%b %d, %Y')}")
+        else:
+            month_weeks = calendar_module.Calendar(firstweekday=calendar_module.MONDAY).monthdatescalendar(
+                anchor.year, anchor.month
+            )
+            calendar_days = [day for week in month_weeks for day in week]
+            st.caption(anchor.strftime("%B %Y"))
+
+        def safe_calendar_color(value):
+            return value if isinstance(value, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", value) else app_theme["button"]
+
+        assignments_by_id = {assignment.get("id"): assignment for assignment in data["assignments"]}
+        calendar_markup = [
+            '<div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;">'
+        ]
+        for weekday in WEEKDAY_NAMES:
+            calendar_markup.append(
+                f'<div style="text-align:center;padding:9px 3px;background:{app_theme["dropdown"]};'
+                f'color:{app_theme["text"]};border:1px solid {app_theme["border"]};border-radius:12px;font-weight:700;">'
+                f'{html.escape(weekday[:3])}</div>'
+            )
+
+        for calendar_day in calendar_days:
+            day_key = calendar_day.isoformat()
+            day_style = "" if calendar_period == "Week" or calendar_day.month == anchor.month else "opacity:.55;"
+            today_style = f"border:2px solid {app_theme['button']};" if calendar_day == today else f"border:1px solid {app_theme['border']};"
+            blocks = []
+            for plan_item in plan.get(day_key, []):
+                assignment = assignments_by_id.get(plan_item.get("assignment_id"), {})
+                course_name = assignment.get("course", "")
+                course_color = safe_calendar_color(COURSE_COLORS.get(course_name, app_theme["button"]))
+                if plan_item.get("mode") == "percentage":
+                    detail = f"{plan_item.get('percent', 0)}%"
+                else:
+                    detail = f"{plan_item.get('units', 0)} {plan_item.get('unit', 'units')}"
+                is_due = False
+                try:
+                    is_due = date.fromisoformat(assignment.get("due_date", "")) == calendar_day
+                except (TypeError, ValueError):
+                    pass
+                block_title = html.escape(assignment.get("name", plan_item.get("name", "Assignment")))
+                block_detail = "Due · " + detail if is_due else detail
+                course_label = f'<span style="font-weight:750;color:{course_color};">{html.escape(course_name)}</span>' if course_name else "Assignment"
+                blocks.append(
+                    f'<div style="background:{app_theme["surface"]};color:{app_theme["text"]};border:1px solid {app_theme["border"]};'
+                    f'border-left:4px solid {course_color};border-radius:9px;padding:5px 6px;margin-top:5px;font-size:12px;line-height:1.3;overflow-wrap:anywhere;">'
+                    f'<div style="font-weight:700;">{block_title}</div><div>{course_label} · {html.escape(block_detail)}</div></div>'
+                )
+            for lecture_task in lecture_tasks_by_day.get(day_key, []):
+                course_name = lecture_task.get("course", "")
+                course_color = safe_calendar_color(COURSE_COLORS.get(course_name, app_theme["button"]))
+                try:
+                    class_date = date.fromisoformat(lecture_task.get("class_date", ""))
+                except (TypeError, ValueError):
+                    class_date = calendar_day
+                related_topics = [
+                    topic.get("name", "") for topic in data["class_topics"].get(course_name, [])
+                    if topic.get("class_date") == class_date.isoformat()
+                ]
+                detail = ", ".join(related_topics) if related_topics else f"Class {class_date.strftime('%b %d')}"
+                title = "Lecture prep" if lecture_task.get("type") == "lecture_prep" else "Lecture notes review"
+                if lecture_task.get("completed"):
+                    title = "✓ " + title
+                blocks.append(
+                    f'<div style="background:{app_theme["surface"]};color:{app_theme["text"]};border:1px solid {app_theme["border"]};'
+                    f'border-left:4px solid {course_color};border-radius:9px;padding:5px 6px;margin-top:5px;font-size:12px;line-height:1.3;overflow-wrap:anywhere;">'
+                    f'<div style="font-weight:700;">{html.escape(title)}</div>'
+                    f'<div><span style="font-weight:750;color:{course_color};">{html.escape(course_name)}</span> · {html.escape(detail)}</div></div>'
+                )
+            calendar_markup.append(
+                f'<div style="{today_style}{day_style}background:{app_theme["surface"]};color:{app_theme["text"]};'
+                f'border-radius:13px;padding:7px;min-height:{125 if calendar_period == "Week" else 118}px;min-width:0;">'
+                f'<div style="font-size:13px;font-weight:750;">{calendar_day.day}</div>'
+                + "".join(blocks) + "</div>"
+            )
+        calendar_markup.append("</div>")
+        st.markdown("".join(calendar_markup), unsafe_allow_html=True)
 
     overloaded = []
     for assignment in data["assignments"]:
@@ -1585,9 +2081,33 @@ with tab_schedule:
             unit_text = "%" if assignment.get("mode") == "percentage" else " units"
             st.write(f"• {assignment['name']}: {unscheduled:g}{unit_text} unscheduled")
 
-with tab_settings:
+with tab_appearance:
     st.subheader("Appearance")
-    st.caption("Choose colors for the main areas of the planner. Changes are saved with your data.")
+    st.caption("Choose a ready-made color palette or customize individual colors. Changes are saved with your data.")
+    if palette_notice := st.session_state.pop("theme_palette_notice", None):
+        st.toast(palette_notice, icon="✅")
+    st.markdown("**Preset palettes**")
+    palette_items = list(APP_THEME_PALETTES.items())
+    for palette_row_start in range(0, len(palette_items), 4):
+        palette_columns = st.columns(4)
+        for palette_column, (palette_name, palette) in zip(
+            palette_columns, palette_items[palette_row_start:palette_row_start + 4]
+        ):
+            with palette_column:
+                swatches = [palette[key] for key in ("background", "button", "card", "dropdown", "progress", "hover", "border")]
+                st.markdown(
+                    '<div style="display:flex;height:14px;border-radius:8px;overflow:hidden;'
+                    f'border:1px solid {palette["border"]};margin:4px 0 8px 0;">'
+                    + "".join(f'<span style="flex:1;background:{color};"></span>' for color in swatches)
+                    + "</div>",
+                    unsafe_allow_html=True,
+                )
+                if st.button(f"Use {palette_name}", key=f"use_theme_palette_{palette_name}", use_container_width=True):
+                    data["app_theme"] = dict(palette)
+                    save_data(data)
+                    st.session_state["refresh_theme_widgets_pending"] = True
+                    st.session_state["theme_palette_notice"] = f"{palette_name} palette applied."
+                    st.rerun()
     with st.expander("Customize theme colors", expanded=False):
         with st.form("app_theme_form"):
             theme_left, theme_right = st.columns(2)
@@ -1601,6 +2121,9 @@ with tab_settings:
             theme_card_text = theme_right.color_picker("Assignment card text", app_theme["card_text"], key="theme_card_text")
             theme_input = theme_left.color_picker("Input fields", app_theme["input"], key="theme_input")
             theme_surface = theme_right.color_picker("Forms and panels", app_theme["surface"], key="theme_surface")
+            theme_dropdown = theme_left.color_picker("Dropdowns and expanders", app_theme["dropdown"], key="theme_dropdown")
+            theme_progress = theme_right.color_picker("Progress bar", app_theme["progress"], key="theme_progress")
+            theme_hover = theme_right.color_picker("Hover and menu highlight", app_theme["hover"], key="theme_hover")
             save_theme = st.form_submit_button("Save theme", type="primary")
             if save_theme:
                 data["app_theme"] = {
@@ -1614,23 +2137,39 @@ with tab_settings:
                     "card_text": theme_card_text,
                     "input": theme_input,
                     "surface": theme_surface,
+                    "dropdown": theme_dropdown,
+                    "progress": theme_progress,
+                    "hover": theme_hover,
                 }
                 save_data(data)
+                st.toast("Appearance settings saved.", icon="✅")
                 st.rerun()
-        if st.button("Reset to beige theme", key="reset_app_theme"):
-            data["app_theme"] = dict(APP_THEME_DEFAULTS)
-            save_data(data)
-            st.session_state["reset_app_theme_pending"] = True
-            st.rerun()
 
-    st.divider()
+with tab_courses:
     st.subheader("Courses and categories")
     st.caption("Add your own courses, choose their colors, and set the days each course meets.")
+    if message := st.session_state.pop("course_autosave_notice", None):
+        st.toast(message, icon="✅")
+    if error_message := st.session_state.pop("course_edit_error", None):
+        st.error(error_message)
+    st.caption("Course name, color, meeting days, and lecture prep/review timing save automatically when changed.")
     with st.expander("Add a course or category", expanded=False):
         with st.form("add_course_category", clear_on_submit=True):
             new_category_name = st.text_input("Name")
-            new_category_color = st.color_picker("Color", "#D8E6D3")
+            new_category_color = st.color_picker("Color", app_theme["button"])
             new_category_meeting_days = st.multiselect("Meets on", WEEKDAY_NAMES, default=[])
+            new_category_prep_days = st.selectbox(
+                "Lecture prep",
+                options=[-1] + list(range(15)),
+                index=2,
+                format_func=lambda days: "No lecture prep" if days == -1 else "Same day" if days == 0 else f"{days} day{'s' if days != 1 else ''} before class",
+            )
+            new_category_review_days = st.selectbox(
+                "Lecture review",
+                options=[0, 1, 2],
+                index=1,
+                format_func=lambda days: "Same day" if days == 0 else f"{days} day{'s' if days != 1 else ''} after class",
+            )
             add_category = st.form_submit_button("Add category", type="primary")
             if add_category:
                 normalized_name = new_category_name.strip()
@@ -1642,94 +2181,56 @@ with tab_settings:
                     COURSE_COLORS[normalized_name] = new_category_color
                     COURSES[:] = list(COURSE_COLORS)
                     data["course_meeting_days"][normalized_name] = new_category_meeting_days
+                    data["course_prep_days_before"][normalized_name] = new_category_prep_days
+                    data["course_review_days_after"][normalized_name] = new_category_review_days
                     data["course_categories"] = dict(COURSE_COLORS)
                     save_data(data)
+                    st.toast(f"{normalized_name} added.", icon="✅")
                     st.rerun()
 
     for category_name, category_color in list(COURSE_COLORS.items()):
-        with st.form(f"edit_course_category_{category_name}"):
-            name_col, color_col, save_col, delete_col = st.columns([2.2, 1, 0.8, 0.8])
-            renamed_category = name_col.text_input("Name", category_name, key=f"category_name_{category_name}")
-            recolored_category = color_col.color_picker("Color", category_color, key=f"category_color_{category_name}")
-            category_meeting_days = st.multiselect(
+        with st.container(border=True):
+            st.markdown(f"**{html.escape(category_name)}**")
+            name_col, color_col, prep_col, review_col = st.columns([2.1, 1, 1.25, 1.25])
+            name_col.text_input(
+                "Course name", category_name,
+                key=f"category_name_{category_name}",
+                on_change=save_course_settings, args=(category_name,),
+            )
+            color_col.color_picker(
+                "Color", category_color,
+                key=f"category_color_{category_name}",
+                on_change=save_course_settings, args=(category_name,),
+            )
+            prep_options = [-1] + list(range(15))
+            prep_value = data["course_prep_days_before"].get(category_name, 1)
+            prep_col.selectbox(
+                "Lecture prep",
+                options=prep_options,
+                index=prep_options.index(prep_value),
+                format_func=lambda days: "No lecture prep" if days == -1 else "Same day" if days == 0 else f"{days} day{'s' if days != 1 else ''} before class",
+                key=f"category_prep_days_{category_name}",
+                on_change=save_course_settings, args=(category_name,),
+            )
+            review_col.selectbox(
+                "Lecture review",
+                options=[0, 1, 2],
+                index=data["course_review_days_after"].get(category_name, 1),
+                format_func=lambda days: "Same day" if days == 0 else f"{days} day{'s' if days != 1 else ''} after class",
+                key=f"category_review_days_{category_name}",
+                on_change=save_course_settings, args=(category_name,),
+            )
+            st.multiselect(
                 "Meets on", WEEKDAY_NAMES,
                 default=data["course_meeting_days"].get(category_name, []),
                 key=f"category_meeting_days_{category_name}",
+                on_change=save_course_settings, args=(category_name,),
             )
-            save_category = save_col.form_submit_button("Save")
-            delete_category = delete_col.form_submit_button("Delete")
-            if save_category:
-                normalized_name = renamed_category.strip()
-                duplicate_name = any(
-                    name != category_name and name.casefold() == normalized_name.casefold()
-                    for name in COURSE_COLORS
-                )
-                if not normalized_name:
-                    st.error("Enter a course or category name.")
-                elif duplicate_name:
-                    st.error("That course or category already exists.")
-                else:
-                    updated_categories = {
-                        (normalized_name if name == category_name else name):
-                        (recolored_category if name == category_name else color)
-                        for name, color in COURSE_COLORS.items()
-                    }
-                    COURSE_COLORS.clear()
-                    COURSE_COLORS.update(updated_categories)
-                    if normalized_name != category_name and category_name in data["class_topics"]:
-                        data["class_topics"][normalized_name] = data["class_topics"].pop(category_name)
-                    if normalized_name != category_name and category_name in data["course_meeting_days"]:
-                        data["course_meeting_days"][normalized_name] = data["course_meeting_days"].pop(category_name)
-                    data["course_meeting_days"][normalized_name] = category_meeting_days
-                    for assignment in data["assignments"]:
-                        if assignment.get("course") == category_name:
-                            assignment["course"] = normalized_name
-                    for lecture_task in data["lecture_tasks"]:
-                        if lecture_task.get("course") == category_name:
-                            lecture_task["course"] = normalized_name
-                            lecture_task["id"] = lecture_task["id"].replace(f"{category_name}|", f"{normalized_name}|", 1)
-                    COURSES[:] = list(COURSE_COLORS)
-                    data["course_categories"] = dict(COURSE_COLORS)
-                    save_data(data)
-                    st.rerun()
-            if delete_category:
-                if len(COURSE_COLORS) <= 1:
-                    st.error("Keep at least one course or category.")
-                else:
-                    remaining_categories = {
-                        name: color for name, color in COURSE_COLORS.items()
-                        if name != category_name
-                    }
-                    replacement_category = next(iter(remaining_categories))
-                    for assignment in data["assignments"]:
-                        if assignment.get("course") == category_name:
-                            assignment["course"] = replacement_category
-                    data["class_topics"].pop(category_name, None)
-                    data["course_meeting_days"].pop(category_name, None)
-                    data["lecture_tasks"] = [
-                        task for task in data["lecture_tasks"] if task.get("course") != category_name
-                    ]
-                    COURSE_COLORS.clear()
-                    COURSE_COLORS.update(remaining_categories)
-                    COURSES[:] = list(COURSE_COLORS)
-                    data["course_categories"] = dict(COURSE_COLORS)
-                    save_data(data)
-                    st.rerun()
+            st.button(
+                "Delete course", key=f"delete_course_{category_name}",
+                on_click=delete_course_settings, args=(category_name,),
+            )
 
-    st.divider()
-    st.subheader("How scheduling works")
-    st.markdown(
-        "- Calendar events are treated as busy time.\\n"
-        "- Gaps of 30 minutes or less between events are merged into the busy block.\\n"
-        "- Free time is measured only inside your waking hours.\\n"
-        "- The sidebar shows estimated free hours for each date and lets you override them individually.\\n"
-        "- Work is distributed directly in proportion to the available hours you enter.\\n"
-        "- Daily targets are whole units and are rounded up to build in a small early-completion buffer.\\n"
-        "- Earlier deadlines are scheduled first.\\n"
-        "- The plan is recalculated whenever you change progress, assignments, calendar, or settings."
-    )
-    st.markdown("**Progress types:** Unit-based assignments are scheduled as questions/pages/problems per day. Percentage assignments are scheduled as percentage points per day until they reach 100%. Both use the start date, due date, and the daily availability values shown in the sidebar.")
-    st.caption("Calendar data and assignment data stay in this folder on your computer.")
     export_json = json.dumps(data, indent=2)
     st.download_button("Download assignment backup (JSON)", export_json, "assignments_backup.json", "application/json")
     if st.button("Export assignments as CSV"):
