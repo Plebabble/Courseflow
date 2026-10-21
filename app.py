@@ -408,7 +408,7 @@ def save_course_settings(course_name):
     prep_days = int(st.session_state.get(prep_key, data["course_prep_days_before"].get(course_name, 1)))
     prep_days = -1 if prep_days < 0 else min(14, max(0, prep_days))
     review_days = int(st.session_state.get(review_key, data["course_review_days_after"].get(course_name, 1)))
-    review_days = min(2, max(0, review_days))
+    review_days = min(14, max(0, review_days))
 
     updated_categories = {
         (new_name if name == course_name else name):
@@ -737,42 +737,80 @@ def build_schedule(assignments, settings, events, has_calendar, today=None):
         due = date.fromisoformat(assignment["due_date"])
         start = date.fromisoformat(assignment.get("start_date", today.isoformat()))
 
-        # If some progress was recorded today, schedule the rest from tomorrow.
         today_done = float(assignment.get("today_completed", 0))
-        first_day = today + timedelta(days=1) if today_done > 0 else max(today, start)
         eligible = [
             d for d in days
-            if first_day <= d["date"] <= due and d["availability_weight"] > 0
+            if max(today, start) <= d["date"] <= due and d["availability_weight"] > 0
         ]
-        total_weight = sum(d["availability_weight"] for d in eligible)
+        today_is_eligible = bool(eligible and eligible[0]["date"] == today)
 
-        if remaining > 0 and eligible and total_weight > 0:
+        def allocate(amount, available_days):
+            """Return this assignment's usual daily split across the given days."""
+            amount = max(0.0, float(amount))
+            total_weight = sum(day_info["availability_weight"] for day_info in available_days)
+            if amount <= 0 or not available_days or total_weight <= 0:
+                return [0] * len(available_days)
             if is_percentage:
-                # Allocate whole percentage points, with rounding balanced across days.
-                shares = [remaining * d["availability_weight"] / total_weight for d in eligible]
+                shares = [amount * day_info["availability_weight"] / total_weight for day_info in available_days]
                 targets = [int(math.floor(value)) for value in shares]
-                points_left = int(round(remaining)) - sum(targets)
+                points_left = int(round(amount)) - sum(targets)
                 order = sorted(range(len(shares)), key=lambda i: shares[i] - targets[i], reverse=True)
                 for index in order[:max(0, points_left)]:
                     targets[index] += 1
-                for day_info, target in zip(eligible, targets):
-                    if target > 0:
-                        plan[day_info["date"].isoformat()].append({
-                            "assignment_id": assignment["id"], "name": assignment["name"],
-                            "percent": target, "mode": "percentage",
-                        })
-                remaining = max(0.0, remaining - sum(targets))
-            else:
-                for day_info in eligible:
-                    if remaining <= 0:
-                        break
-                    ideal_share = int(assignment["remaining_units"]) * day_info["availability_weight"] / total_weight
-                    target = min(remaining, max(1, math.ceil(ideal_share)))
-                    plan[day_info["date"].isoformat()].append({
+                return targets
+
+            total_units = int(amount)
+            units_left = total_units
+            targets = []
+            for day_info in available_days:
+                if units_left <= 0:
+                    targets.append(0)
+                    continue
+                ideal_share = total_units * day_info["availability_weight"] / total_weight
+                target = min(units_left, max(1, math.ceil(ideal_share)))
+                targets.append(target)
+                units_left -= target
+            return targets
+
+        if remaining > 0 and eligible:
+            # Include today's completed work when calculating the daily split.
+            # That keeps today's target stable across multiple progress updates.
+            work_at_start_of_today = remaining + today_done if today_is_eligible else remaining
+            scheduled_targets = allocate(work_at_start_of_today, eligible)
+            future_days = eligible[1:] if today_is_eligible else eligible
+            future_work = remaining
+
+            if today_is_eligible:
+                today_target = scheduled_targets[0]
+                still_due_today = max(0, today_target - today_done)
+                future_work = max(0, remaining - still_due_today)
+                if still_due_today > 0:
+                    item = {
                         "assignment_id": assignment["id"], "name": assignment["name"],
-                        "units": target, "unit": assignment["unit"], "mode": "units",
-                    })
-                    remaining -= target
+                        "mode": "percentage" if is_percentage else "units",
+                    }
+                    if is_percentage:
+                        item["percent"] = today_target
+                    else:
+                        item["units"] = today_target
+                        item["unit"] = assignment["unit"]
+                    plan[today.isoformat()].append(item)
+
+            future_targets = allocate(future_work, future_days)
+            for day_info, target in zip(future_days, future_targets):
+                if target <= 0:
+                    continue
+                item = {
+                    "assignment_id": assignment["id"], "name": assignment["name"],
+                    "mode": "percentage" if is_percentage else "units",
+                }
+                if is_percentage:
+                    item["percent"] = target
+                else:
+                    item["units"] = target
+                    item["unit"] = assignment["unit"]
+                plan[day_info["date"].isoformat()].append(item)
+            remaining = max(0.0, future_work - sum(future_targets))
 
         assignment["unscheduled_percent" if is_percentage else "unscheduled_units"] = remaining
 
@@ -851,7 +889,7 @@ for course_name in COURSE_COLORS:
         review_days_after = int(saved_review_offsets.get(course_name, 1))
     except (TypeError, ValueError):
         review_days_after = 1
-    data["course_review_days_after"][course_name] = min(2, max(0, review_days_after))
+    data["course_review_days_after"][course_name] = min(14, max(0, review_days_after))
 if not isinstance(data.get("lecture_tasks"), list):
     data["lecture_tasks"] = []
 saved_theme = data.get("app_theme")
@@ -1531,28 +1569,13 @@ with tab_today:
                 f'<div style="font-size:.82rem;opacity:.78;margin-top:3px;">{html.escape(detail)}</div></div>',
                 unsafe_allow_html=True,
             )
-            if lecture_task.get("type") == "lecture_notes_review":
-                review_outcome = done_col.selectbox(
-                    "Review result",
-                    ["Choose a color", "Red · extremely hard", "Orange · struggled", "Yellow · partly understood", "Green · easy"],
-                    key=f"lecture_review_color_{lecture_task['id']}",
-                    label_visibility="collapsed",
-                )
-                if done_col.button("Mark review done", key=f"complete_lecture_{lecture_task['id']}", use_container_width=True):
-                    if review_outcome == "Choose a color":
-                        st.warning("Choose a color for how the review went before marking it done.")
-                    else:
-                        lecture_task["review_color"] = review_outcome.split(" · ", 1)[0]
-                        lecture_task["completed"] = True
-                        lecture_task["completed_date"] = today.isoformat()
-                        save_data(data)
-                        st.toast("Lecture review recorded.", icon="✅")
-                        st.rerun()
-            elif done_col.button("Mark done", key=f"complete_lecture_{lecture_task['id']}", use_container_width=True):
+            completion_label = "Mark review done" if lecture_task.get("type") == "lecture_notes_review" else "Mark done"
+            if done_col.button(completion_label, key=f"complete_lecture_{lecture_task['id']}", use_container_width=True):
                 lecture_task["completed"] = True
                 lecture_task["completed_date"] = today.isoformat()
                 save_data(data)
-                st.toast(f"{title} complete!", icon="✅")
+                completion_message = "Lecture review recorded." if lecture_task.get("type") == "lecture_notes_review" else f"{title} complete!"
+                st.toast(completion_message, icon="✅")
                 st.rerun()
     if not today_items and not today_lecture_tasks:
         st.info("Nothing is scheduled for today. Add assignments or check your calendar availability.")
@@ -1590,21 +1613,26 @@ with tab_today:
                         '<div class="historical-progress">Before today: '
                         f'{completed_before_today} {html.escape(historical_unit)} completed</div>'
                     )
+                completed_today = int(assignment.get("today_completed", 0))
                 if item.get("mode") == "percentage":
-                    target_text, unit_label = f"{item['percent']}%", "completion"
+                    daily_target = int(item["percent"])
+                    remaining_today = max(0, daily_target - completed_today)
+                    target_text, unit_label = f"{remaining_today}%", "completion"
                 else:
+                    daily_target = int(item["units"])
+                    remaining_today = max(0, daily_target - completed_today)
                     unit_label = item["unit"].lower()
-                    if int(item["units"]) == 1 and unit_label.endswith("s"):
+                    if remaining_today == 1 and unit_label.endswith("s"):
                         unit_label = unit_label[:-1]
-                    elif int(item["units"]) != 1 and not unit_label.endswith("s"):
+                    elif remaining_today != 1 and not unit_label.endswith("s"):
                         unit_label += "s"
-                    target_text = str(item["units"])
+                    target_text = str(remaining_today)
 
                 st.markdown(
                     f"""
                     <div class="{card_class}">
                         <div class="assignment-title" style="background:{course_color};">{html.escape(item['name'])}</div>{due_tag}
-                        <div class="target-label">Today's target</div>
+                        <div class="target-label">Left to do today</div>
                         <div class="target-line">
                             <div class="target-number">{target_text}</div>
                             <div class="target-unit">{html.escape(unit_label)}</div>
@@ -1617,16 +1645,16 @@ with tab_today:
                 )
                 with st.form(f"progress_{assignment['id']}"):
                     progress_col, action_col = st.columns([1, 1.15], vertical_alignment="bottom")
-                    progress_col.markdown('<div class="today-progress-label">Completed today</div>', unsafe_allow_html=True)
+                    progress_col.markdown('<div class="today-progress-label">Total completed today</div>', unsafe_allow_html=True)
                     if assignment.get("mode") == "percentage":
                         amount = progress_col.number_input(
-                            "Percentage completed today", min_value=0, max_value=100,
+                            "Total percentage completed today", min_value=0, max_value=100,
                             value=int(assignment.get("today_completed", 0)), step=1,
                             key=f"today_{assignment['id']}", label_visibility="collapsed"
                         )
                     else:
                         amount = progress_col.number_input(
-                            "Units completed today", min_value=0,
+                            "Total units completed today", min_value=0,
                             max_value=max(0, int(assignment["total_units"]) - (
                                 int(assignment["completed_units"]) - int(assignment.get("today_completed", 0))
                             )),
@@ -1952,8 +1980,6 @@ with tab_schedule:
                             detail = ", ".join(related_topics) if related_topics else f"Class on {class_date.strftime('%a, %b %d')}"
                             if lecture_task.get("completed"):
                                 status = "✓ Done"
-                                if lecture_task.get("type") == "lecture_notes_review" and lecture_task.get("review_color"):
-                                    status += f" · {lecture_task['review_color']}"
                             elif day > today:
                                 status = "Upcoming"
                             else:
@@ -2166,7 +2192,7 @@ with tab_courses:
             )
             new_category_review_days = st.selectbox(
                 "Lecture review",
-                options=[0, 1, 2],
+                options=list(range(15)),
                 index=1,
                 format_func=lambda days: "Same day" if days == 0 else f"{days} day{'s' if days != 1 else ''} after class",
             )
@@ -2214,7 +2240,7 @@ with tab_courses:
             )
             review_col.selectbox(
                 "Lecture review",
-                options=[0, 1, 2],
+                options=list(range(15)),
                 index=data["course_review_days_after"].get(category_name, 1),
                 format_func=lambda days: "Same day" if days == 0 else f"{days} day{'s' if days != 1 else ''} after class",
                 key=f"category_review_days_{category_name}",
